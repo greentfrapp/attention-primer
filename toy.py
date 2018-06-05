@@ -49,7 +49,8 @@ class CountingAttentionModel(object):
 		)
 
 		self.dec_input = tf.Variable(
-			initial_value=np.expand_dims(np.concatenate((np.ones((1, 8))*-0.02, np.ones((1, 8))*-0.01, np.ones((1, 8))*0.01, np.ones((1, 8))*0.02)), axis=0),
+			initial_value=np.expand_dims(np.concatenate((np.ones((1, 64))*-0.02, np.ones((1, 64))*-0.01, np.ones((1, 64))*0.01, np.ones((1, 64))*0.02)), axis=0),
+			# initial_value=np.random.randn(1, 4, 64),
 			trainable=True,
 			dtype=tf.float32,
 			name="dec_input",
@@ -60,14 +61,14 @@ class CountingAttentionModel(object):
 		# increase dims
 		self.enc_key = tf.layers.dense(
 			inputs=self.input,
-			units=8,
+			units=64,
 			activation=None,
 			name="enc_key"
 		)
 
 		self.enc_val = tf.layers.dense(
 			inputs=self.input,
-			units=8,
+			units=64,
 			activation=tf.nn.relu,
 			name="enc_val"
 		)
