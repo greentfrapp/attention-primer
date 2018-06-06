@@ -57,5 +57,5 @@ For each output step, we see the learned attention being intuitively weighted on
 
 Just as with a recurrent network, the trained model is able to take in variable sequence lengths, although performance definitely worsens when we deviate from the lengths used in the training set.
 
-Refer to the task's README for more details.
+Refer to the [task](https://github.com/greentfrapp/attention-primer/tree/master/1_counting-letters) for more details.
 
