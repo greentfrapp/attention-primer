@@ -4,31 +4,60 @@ Toy experiment to illustrate counting using Self-Attention
 
 import tensorflow as tf
 import numpy as np
+import string
 from absl import flags
 from absl import app
 
 FLAGS = flags.FLAGS
 
+# Commands
 flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
+
+# Training parameters
+flags.DEFINE_integer("steps", 1000, "Number of training steps")
+flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
+flags.DEFINE_integer("save_every", 50, "Interval between saving model")
+flags.DEFINE_string("savepath", "toy_models/", "Path to save or load model")
+flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
+
+# Model parameters
+flags.DEFINE_integer("hidden", 64, "Hidden dimension in model")
+
+# Task parameters
+flags.DEFINE_integer("max_len", 10, "Maximum input length from toy task")
+flags.DEFINE_integer("vocab_size", 3, "Size of input vocabulary")
 
 
 class ToyTask(object):
 
-	def __init__(self):
+	def __init__(self, max_len=10, vocab_size=3):
 		super(ToyTask, self).__init__()
+		self.max_len = max_len
+		self.vocab_size = vocab_size
+		assert self.vocab_size <= 26, "vocab_size needs to be <= 26 since we are using letters to prettify LOL"
 
-	def next_batch(self, batchsize=100, length=10):
-		x = np.eye(4)[np.random.choice(np.arange(4), [batchsize, length])]
-		y = np.eye(length + 1)[np.sum(x, axis=1).astype(np.int32)]
+	def next_batch(self, batchsize=100):
+		x = np.eye(self.vocab_size + 1)[np.random.choice(np.arange(self.vocab_size + 1), [batchsize, self.max_len])]
+		y = np.eye(self.max_len + 1)[np.sum(x, axis=1)[:, 1:].astype(np.int32)]
 		return x, y
+
+	def prettify(self, samples):
+		samples = samples.reshape(-1, self.max_len, self.vocab_size + 1)
+		idx = np.expand_dims(np.argmax(samples, axis=2), axis=2)
+		# This means max vocab_size is 26
+		dictionary = np.array(list(' ' + string.ascii_uppercase))
+		return dictionary[idx]
 
 class CountingAttentionModel(object):
 
-	def __init__(self, sess, name="Counter"):
+	def __init__(self, sess, max_len=10, vocab_size=3, hidden=64, name="Counter"):
 		super(CountingAttentionModel, self).__init__()
-		self.name = name
 		self.sess = sess
+		self.max_len = max_len
+		self.vocab_size = vocab_size
+		self.hidden = hidden
+		self.name = name
 		with tf.variable_scope(self.name):
 			self.build_model()
 			variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.name)
@@ -37,148 +66,109 @@ class CountingAttentionModel(object):
 	def build_model(self):
 
 		self.input = tf.placeholder(
-			shape=(None, 10, 4),
+			shape=(None, self.max_len, self.vocab_size + 1),
 			dtype=tf.float32,
 			name="input",
 		)
 
 		self.labels = tf.placeholder(
-			shape=(None, 4, 11),
+			shape=(None, self.vocab_size, self.max_len + 1),
 			dtype=tf.float32,
 			name="labels",
 		)
 
-		self.dec_input = tf.Variable(
-			initial_value=np.expand_dims(np.concatenate((np.ones((1, 64))*-0.02, np.ones((1, 64))*-0.01, np.ones((1, 64))*0.01, np.ones((1, 64))*0.02)), axis=0),
-			# initial_value=np.random.randn(1, 4, 64),
+		decoder_input = tf.Variable(
+			initial_value=np.zeros((1, self.vocab_size, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
 			name="dec_input",
 		)
 
-		# Does not implement positional encodings for input
-
-		# increase dims
-		self.enc_key = tf.layers.dense(
+		encoding = tf.layers.dense(
 			inputs=self.input,
-			units=64,
+			units=self.hidden,
 			activation=None,
 			name="enc_key"
 		)
 
-		self.enc_val = tf.layers.dense(
-			inputs=self.input,
-			units=64,
-			activation=tf.nn.relu,
-			name="enc_val"
+		decoding, self.att_weights = self.attention(
+			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
+			key=encoding,
+			value=encoding,
 		)
-
-		# enc_att_1, self.enc_att_1_w = self.attention(
-		# 	query=self.enc, 
-		# 	key=self.enc, 
-		# 	value=self.enc,
-		# )
-		# enc_att_1 = tf.layers.dense(
-		# 	inputs=enc_att_1,
-		# 	units=128,
-		# 	activation=tf.nn.relu,
-		# 	name="enc_att_dense_1"
-		# )
-		# enc_att_1 = tf.layers.dense(
-		# 	inputs=enc_att_1,
-		# 	units=11,
-		# 	activation=None,
-		# 	name="enc_att_dense_2"
-		# )
-		# enc_att_1 = tf.nn.l2_normalize(enc_att_1, dim=1)
-
-		# Transit from encoder to decoder
-		# Increase dimensions to output dim
-		# self.encoding = tf.layers.dense(
-		# 	inputs=enc_att_1,
-		# 	units=11,
-		# 	activation=tf.nn.relu,
-		# 	name="enc2dec"
-		# )
-		# Query for decoder
-		dec_att_1, self.dec_att_1_w = self.attention(
-			query=tf.tile(self.dec_input, multiples=tf.concat(([tf.shape(self.labels)[0]], [1], [1]), axis=0)),
-			key=self.enc_key,
-			value=self.enc_val,
-		)
-		# dec_att_1 = tf.layers.dense(
-		# 	inputs=dec_att_1,
-		# 	units=128,
-		# 	activation=tf.nn.relu,
-		# 	name="dec_att_dense_1"
-		# )
-		dec_att_1 = tf.layers.dense(
-			inputs=dec_att_1,
-			units=11,
+		
+		decoding = tf.layers.dense(
+			inputs=decoding,
+			units=self.max_len + 1,
 			activation=None,
-			name="dec_att_dense_2"
+			name="dec_att_dense_2",
 		)
-		# dec_att_1 = tf.nn.l2_normalize(dec_att_1, dim=1)
 
-		self.logits = dec_att_1
+		self.logits = decoding
 		self.predictions = tf.argmax(self.logits, axis=2)
 		self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.logits))
-		self.optimize = tf.train.AdamOptimizer(3e-3).minimize(self.loss)
+		self.optimize = tf.train.AdamOptimizer(1e-2).minimize(self.loss)
 
 	def attention(self, query, key, value):
-		output = tf.matmul(query, key, transpose_b=True) #/ (tf.cast(tf.shape(query)[2], tf.float32) ** 2)
+		output = tf.matmul(query, key, transpose_b=True) / (tf.cast(tf.shape(query)[2], tf.float32) ** 0.5)
 		weights = tf.nn.softmax(output)
 		output = tf.matmul(weights, value) + query
 		output = tf.nn.l2_normalize(output, dim=1)
 		return output, weights
 
-	def save(self, savepath, global_step=None):
-		self.saver.save(self.sess, savepath, global_step=global_step)
+	def save(self, savepath, global_step=None, prefix="ckpt", verbose=False):
+		if savepath[-1] != '/':
+			savepath += '/'
+		self.saver.save(self.sess, savepath + prefix, global_step=global_step)
+		if verbose:
+			print("Model saved to {}.".format(savepath + prefix + '-' + str(global_step)))
 
-	def load(self, savepath):
+	def load(self, savepath, verbose=False):
+		if savepath[-1] != '/':
+			savepath += '/'
 		ckpt = tf.train.latest_checkpoint(savepath)
 		self.saver.restore(self.sess, ckpt)
+		if verbose:
+			print("Model loaded from {}.".format(ckpt))
 
 def main(unused_args):
+
 	if FLAGS.train:
+		tf.gfile.MakeDirs(FLAGS.savepath)
 		with tf.Session() as sess:
-			model = CountingAttentionModel(sess)
+			model = CountingAttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
 			sess.run(tf.global_variables_initializer())
-			task = ToyTask()
-			for i in np.arange(10000):
-				minibatch_x, minibatch_y = task.next_batch()
+			task = ToyTask(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
+			for i in np.arange(FLAGS.steps):
+				minibatch_x, minibatch_y = task.next_batch(batchsize=FLAGS.batchsize)
 				feed_dict = {
 					model.input: minibatch_x,
 					model.labels: minibatch_y,
 				}
 				_, loss = sess.run([model.optimize, model.loss], feed_dict)
-				if (i + 1) % 10 == 0:
-					model.save("toy_models/", i + 1)
+				if (i + 1) % FLAGS.save_every == 0:
+					model.save(FLAGS.savepath, global_step=i + 1)
+				if (i + 1) % FLAGS.print_every == 0:
 					print("Iteration {} - Loss {}".format(i + 1, loss))
-			model.save("toy_models/", i + 1)
 			print("Iteration {} - Loss {}".format(i + 1, loss))
+			print("Training complete!")
+			model.save(FLAGS.savepath, global_step=i + 1, verbose=True)
 
 	if FLAGS.test:
 		with tf.Session() as sess:
-			model = CountingAttentionModel(sess)
-			# sess.run(tf.global_variables_initializer())
-			model.load("toy_models/")
-			task = ToyTask()
+			model = CountingAttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
+			model.load(FLAGS.savepath)
+			task = ToyTask(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
 			samples, labels = task.next_batch(batchsize=1)
-			print(samples)
+			print("\nInput: \n{}".format(task.prettify(samples)))
 			feed_dict = {
 				model.input: samples,
-				model.labels: labels,
 			}
-			predictions, att = sess.run([model.predictions, model.dec_att_1_w], feed_dict)
-			print(predictions)
-			print(att)
+			predictions, attention = sess.run([model.predictions, model.att_weights], feed_dict)
+			print("\nPrediction: \n{}".format(predictions))
 			print()
-
-			dec_input, enc_key = sess.run([model.dec_input, model.enc_key], feed_dict)
-			print(dec_input.shape)
-			print((np.expand_dims((dec_input[:, 1, :] > 0).astype(int), axis=0)))
-			print((enc_key > 0).astype(int))
+			for i, output_step in enumerate(attention[0]):
+				print("Step {} attended mainly to: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
 
 if __name__ == "__main__":
 	app.run(main)
