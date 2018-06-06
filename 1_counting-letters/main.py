@@ -18,7 +18,7 @@ flags.DEFINE_bool("test", False, "Test")
 flags.DEFINE_integer("steps", 1000, "Number of training steps")
 flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
 flags.DEFINE_integer("save_every", 50, "Interval between saving model")
-flags.DEFINE_string("savepath", "toy_models/", "Path to save or load model")
+flags.DEFINE_string("savepath", "models/", "Path to save or load model")
 flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
 
 # Model parameters
@@ -29,10 +29,10 @@ flags.DEFINE_integer("max_len", 10, "Maximum input length from toy task")
 flags.DEFINE_integer("vocab_size", 3, "Size of input vocabulary")
 
 
-class ToyTask(object):
+class Task(object):
 
 	def __init__(self, max_len=10, vocab_size=3):
-		super(ToyTask, self).__init__()
+		super(Task, self).__init__()
 		self.max_len = max_len
 		self.vocab_size = vocab_size
 		assert self.vocab_size <= 26, "vocab_size needs to be <= 26 since we are using letters to prettify LOL"
@@ -49,10 +49,10 @@ class ToyTask(object):
 		dictionary = np.array(list(' ' + string.ascii_uppercase))
 		return dictionary[idx]
 
-class CountingAttentionModel(object):
+class AttentionModel(object):
 
 	def __init__(self, sess, max_len=10, vocab_size=3, hidden=64, name="Counter"):
-		super(CountingAttentionModel, self).__init__()
+		super(AttentionModel, self).__init__()
 		self.sess = sess
 		self.max_len = max_len
 		self.vocab_size = vocab_size
@@ -81,14 +81,14 @@ class CountingAttentionModel(object):
 			initial_value=np.zeros((1, self.vocab_size, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
-			name="dec_input",
+			name="decoder_input",
 		)
 
 		encoding = tf.layers.dense(
 			inputs=self.input,
 			units=self.hidden,
 			activation=None,
-			name="enc_key"
+			name="encoding"
 		)
 
 		decoding, self.att_weights = self.attention(
@@ -101,7 +101,7 @@ class CountingAttentionModel(object):
 			inputs=decoding,
 			units=self.max_len + 1,
 			activation=None,
-			name="dec_att_dense_2",
+			name="decoding",
 		)
 
 		self.logits = decoding
@@ -110,11 +110,19 @@ class CountingAttentionModel(object):
 		self.optimize = tf.train.AdamOptimizer(1e-2).minimize(self.loss)
 
 	def attention(self, query, key, value):
+		# Equation 1 in Vaswani et al. (2017)
+		# 	Scaled dot product between Query and Keys
 		output = tf.matmul(query, key, transpose_b=True) / (tf.cast(tf.shape(query)[2], tf.float32) ** 0.5)
-		weights = tf.nn.softmax(output)
-		output = tf.matmul(weights, value) + query
+		# 	Softmax to get attention weights
+		attention_weights = tf.nn.softmax(output)
+		# 	Multiply weights by Values
+		weighted_sum = tf.matmul(attention_weights, value)
+		# Following Figure 1 and Section 3.1 in Vaswani et al. (2017)
+		# 	Residual connection ie. add weighted sum to original query
+		output = weighted_sum + query
+		# 	Layer normalization
 		output = tf.nn.l2_normalize(output, dim=1)
-		return output, weights
+		return output, attention_weights
 
 	def save(self, savepath, global_step=None, prefix="ckpt", verbose=False):
 		if savepath[-1] != '/':
@@ -136,9 +144,9 @@ def main(unused_args):
 	if FLAGS.train:
 		tf.gfile.MakeDirs(FLAGS.savepath)
 		with tf.Session() as sess:
-			model = CountingAttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
+			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
 			sess.run(tf.global_variables_initializer())
-			task = ToyTask(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
+			task = Task(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
 			for i in np.arange(FLAGS.steps):
 				minibatch_x, minibatch_y = task.next_batch(batchsize=FLAGS.batchsize)
 				feed_dict = {
@@ -156,9 +164,9 @@ def main(unused_args):
 
 	if FLAGS.test:
 		with tf.Session() as sess:
-			model = CountingAttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
+			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
 			model.load(FLAGS.savepath)
-			task = ToyTask(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
+			task = Task(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
 			samples, labels = task.next_batch(batchsize=1)
 			print("\nInput: \n{}".format(task.prettify(samples)))
 			feed_dict = {
@@ -168,7 +176,7 @@ def main(unused_args):
 			print("\nPrediction: \n{}".format(predictions))
 			print()
 			for i, output_step in enumerate(attention[0]):
-				print("Step {} attended mainly to: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
+				print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
 
 if __name__ == "__main__":
 	app.run(main)
