@@ -77,24 +77,41 @@ class AttentionModel(object):
 			name="labels",
 		)
 
-		decoder_input = tf.Variable(
+		decoder_query = tf.Variable(
 			initial_value=np.zeros((1, self.vocab_size, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
-			name="decoder_input",
+			name="decoder_query",
 		)
 
-		encoding = tf.layers.dense(
+		self.position = input_positional_coding = tf.Variable(
+			initial_value=np.zeros((1, self.max_len, self.hidden)),
+			trainable=True,
+			dtype=tf.float32,
+			name="input_positional_coding"
+		)
+
+		encoder_keys = tf.layers.dense(
 			inputs=self.input,
 			units=self.hidden,
 			activation=None,
-			name="encoding"
+			name="encoder_keys"
 		)
 
+		encoder_values = tf.layers.dense(
+			inputs=self.input,
+			units=self.hidden,
+			activation=None,
+			name="encoder_values"
+		)
+
+		# encoder_values += tf.tile(input_positional_coding, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0))
+		encoder_values += input_positional_coding
+
 		decoding, self.att_weights = self.attention(
-			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
-			key=encoding,
-			value=encoding,
+			query=tf.tile(decoder_query, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
+			key=encoder_keys,
+			value=encoder_values,
 		)
 		
 		decoding = tf.layers.dense(
@@ -121,7 +138,6 @@ class AttentionModel(object):
 		# 	Residual connection ie. add weighted sum to original query
 		output = weighted_sum + query
 		# 	Layer normalization
-		# output = tf.nn.l2_normalize(output, dim=1)
 		output = tf.contrib.layers.layer_norm(output, begin_norm_axis=2)
 		return output, attention_weights
 

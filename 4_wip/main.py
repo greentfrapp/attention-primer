@@ -38,8 +38,14 @@ class Task(object):
 		assert self.vocab_size <= 26, "vocab_size needs to be <= 26 since we are using letters to prettify LOL"
 
 	def next_batch(self, batchsize=100):
-		x = np.eye(self.vocab_size + 1)[np.random.choice(np.arange(self.vocab_size + 1), [batchsize, self.max_len])]
-		y = np.eye(self.max_len + 1)[np.sum(x, axis=1)[:, 1:].astype(np.int32)]
+		signal = np.random.choice(np.arange(self.max_len), [batchsize, 1])
+		seq = np.random.choice(np.arange(self.max_len, self.max_len + self.vocab_size), [batchsize, self.max_len])
+		x = np.eye(self.max_len + self.vocab_size)[np.concatenate((signal, seq), axis=1)]
+		labels = []
+		for i, sig in enumerate(signal):
+			labels.append(seq[i, sig].tolist())
+		labels = np.array(labels) - self.max_len
+		y = np.eye(self.vocab_size)[labels]
 		return x, y
 
 	def prettify(self, samples):
@@ -66,22 +72,29 @@ class AttentionModel(object):
 	def build_model(self):
 
 		self.input = tf.placeholder(
-			shape=(None, self.max_len, self.vocab_size + 1),
+			shape=(None, self.max_len + 1, self.max_len + self.vocab_size),
 			dtype=tf.float32,
 			name="input",
 		)
 
 		self.labels = tf.placeholder(
-			shape=(None, self.vocab_size, self.max_len + 1),
+			shape=(None, 1, self.vocab_size),
 			dtype=tf.float32,
 			name="labels",
 		)
 
 		decoder_input = tf.Variable(
-			initial_value=np.zeros((1, self.vocab_size, self.hidden)),
+			initial_value=np.zeros((1, 1, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
 			name="decoder_input",
+		)
+
+		positional_encoding = tf.Variable(
+			initial_value=np.zeros((1, self.max_len + 1, self.hidden)),
+			trainable=True,
+			dtype=tf.float32,
+			name="positional_encoding"
 		)
 
 		encoding = tf.layers.dense(
@@ -90,16 +103,30 @@ class AttentionModel(object):
 			activation=None,
 			name="encoding"
 		)
+		encoding += positional_encoding
 
 		decoding, self.att_weights = self.attention(
 			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
 			key=encoding,
 			value=encoding,
 		)
+		dense = tf.layers.dense(
+			inputs=decoding,
+			units=self.hidden * 2,
+			activation=tf.nn.relu,
+			name="decoder_dense",
+		)
+		decoding += tf.layers.dense(
+			inputs=dense,
+			units=self.hidden,
+			activation=None,
+			name="decoder_dense_2"
+		)
+		decoding = tf.contrib.layers.layer_norm(decoding, begin_norm_axis=2)
 		
 		decoding = tf.layers.dense(
 			inputs=decoding,
-			units=self.max_len + 1,
+			units=self.vocab_size,
 			activation=None,
 			name="decoding",
 		)
@@ -107,7 +134,7 @@ class AttentionModel(object):
 		self.logits = decoding
 		self.predictions = tf.argmax(self.logits, axis=2)
 		self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.logits))
-		self.optimize = tf.train.AdamOptimizer(1e-2).minimize(self.loss)
+		self.optimize = tf.train.AdamOptimizer(1e-3).minimize(self.loss)
 
 	def attention(self, query, key, value):
 		# Equation 1 in Vaswani et al. (2017)
@@ -179,6 +206,7 @@ def main(unused_args):
 			for i, output_step in enumerate(attention[0]):
 				print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
 			print(attention)
+
 
 if __name__ == "__main__":
 	app.run(main)

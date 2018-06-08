@@ -22,7 +22,7 @@ flags.DEFINE_string("savepath", "models/", "Path to save or load model")
 flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
 
 # Model parameters
-flags.DEFINE_integer("hidden", 64, "Hidden dimension in model")
+flags.DEFINE_integer("hidden", 256, "Hidden dimension in model")
 
 # Task parameters
 flags.DEFINE_integer("max_len", 10, "Maximum input length from toy task")
@@ -38,15 +38,17 @@ class Task(object):
 		assert self.vocab_size <= 26, "vocab_size needs to be <= 26 since we are using letters to prettify LOL"
 
 	def next_batch(self, batchsize=100):
-		x = np.eye(self.vocab_size + 1)[np.random.choice(np.arange(self.vocab_size + 1), [batchsize, self.max_len])]
-		y = np.eye(self.max_len + 1)[np.sum(x, axis=1)[:, 1:].astype(np.int32)]
+		signal = np.eye(1 + 2 * self.vocab_size)[np.random.choice(np.arange(self.vocab_size), [batchsize, 1])]
+		seq = np.eye(1 + 2 * self.vocab_size)[np.random.choice(np.arange(1 + self.vocab_size, 1 + 2 * self.vocab_size), [batchsize, self.max_len])]
+		x = np.concatenate((signal, seq), axis=1)
+		y = np.expand_dims(np.eye(self.max_len + 1)[np.sum(np.argmax(signal, axis=2) == (np.argmax(seq, axis=2) - (self.vocab_size + 1)), axis=1)], axis=1)
 		return x, y
 
 	def prettify(self, samples):
-		samples = samples.reshape(-1, self.max_len, self.vocab_size + 1)
+		samples = samples.reshape(-1, self.max_len + 1, 2 * self.vocab_size + 1)
 		idx = np.expand_dims(np.argmax(samples, axis=2), axis=2)
 		# This means max vocab_size is 26
-		dictionary = np.array(list(' ' + string.ascii_uppercase))
+		dictionary = np.array(list(string.ascii_uppercase[:self.vocab_size] + ' ' + string.ascii_uppercase))
 		return dictionary[idx]
 
 class AttentionModel(object):
@@ -66,36 +68,126 @@ class AttentionModel(object):
 	def build_model(self):
 
 		self.input = tf.placeholder(
-			shape=(None, self.max_len, self.vocab_size + 1),
+			shape=(None, self.max_len + 1, 2 * self.vocab_size + 1),
 			dtype=tf.float32,
 			name="input",
 		)
 
 		self.labels = tf.placeholder(
-			shape=(None, self.vocab_size, self.max_len + 1),
+			shape=(None, 1, self.max_len + 1),
 			dtype=tf.float32,
 			name="labels",
 		)
 
+		input_positional_coding = tf.Variable(
+			initial_value=np.zeros((1, self.max_len + 1, self.hidden)),
+			trainable=True,
+			dtype=tf.float32,
+			name="input_positional_coding"
+		)
+
 		decoder_input = tf.Variable(
-			initial_value=np.zeros((1, self.vocab_size, self.hidden)),
+			initial_value=np.zeros((1, 1, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
 			name="decoder_input",
 		)
 
+		# Input Embedding
 		encoding = tf.layers.dense(
 			inputs=self.input,
 			units=self.hidden,
-			activation=None,
+			activation=tf.nn.relu,
 			name="encoding"
 		)
 
-		decoding, self.att_weights = self.attention(
+		# Add positional encodings
+		encoding += tf.tile(input_positional_coding, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0))
+
+		# Encoder Layer 1
+		encoding, _ = self.attention(
+			query=encoding,
+			key=encoding,
+			value=encoding,
+		)
+		dense = tf.layers.dense(
+			inputs=encoding,
+			units=self.hidden,
+			activation=tf.nn.relu,
+			name="encoder_layer1_dense1"
+		)
+		encoding += tf.layers.dense(
+			inputs=dense,
+			units=self.hidden,
+			activation=None,
+			name="encoder_layer1_dense2"
+		)
+		encoding = tf.nn.l2_normalize(encoding, dim=1)
+
+		# Encoder Layer 2
+		encoding, _ = self.attention(
+			query=encoding,
+			key=encoding,
+			value=encoding,
+		)
+		dense = tf.layers.dense(
+			inputs=encoding,
+			units=self.hidden,
+			activation=tf.nn.relu,
+			name="encoder_layer2_dense1"
+		)
+		encoding += tf.layers.dense(
+			inputs=dense,
+			units=self.hidden,
+			activation=None,
+			name="encoder_layer2_dense2"
+		)
+		encoding = tf.nn.l2_normalize(encoding, dim=1)
+
+		# Decoder Layer 1
+		decoding, _ = self.attention(
 			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
 			key=encoding,
 			value=encoding,
 		)
+		dense = tf.layers.dense(
+			inputs=decoding,
+			units=self.hidden,
+			activation=tf.nn.relu,
+			name="decoder_layer1_dense1"
+		)
+		decoding += tf.layers.dense(
+			inputs=dense,
+			units=self.hidden,
+			activation=None,
+			name="decoder_layer1_dense2"
+		)
+		decoding = tf.nn.l2_normalize(decoding, dim=1)
+
+		# Decoder Layer 2
+		decoding, _ = self.attention(
+			query=decoding,
+			key=decoding,
+			value=decoding,
+		)
+		decoding, _ = self.attention(
+			query=decoding,
+			key=encoding,
+			value=encoding,
+		)
+		dense = tf.layers.dense(
+			inputs=decoding,
+			units=self.hidden,
+			activation=tf.nn.relu,
+			name="decoder_layer2_dense1"
+		)
+		decoding += tf.layers.dense(
+			inputs=dense,
+			units=self.hidden,
+			activation=None,
+			name="decoder_layer2_dense2"
+		)
+		decoding = tf.nn.l2_normalize(decoding, dim=1)
 		
 		decoding = tf.layers.dense(
 			inputs=decoding,
@@ -107,7 +199,7 @@ class AttentionModel(object):
 		self.logits = decoding
 		self.predictions = tf.argmax(self.logits, axis=2)
 		self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.logits))
-		self.optimize = tf.train.AdamOptimizer(1e-2).minimize(self.loss)
+		self.optimize = tf.train.AdamOptimizer(1e-3).minimize(self.loss)
 
 	def attention(self, query, key, value):
 		# Equation 1 in Vaswani et al. (2017)
@@ -121,8 +213,7 @@ class AttentionModel(object):
 		# 	Residual connection ie. add weighted sum to original query
 		output = weighted_sum + query
 		# 	Layer normalization
-		# output = tf.nn.l2_normalize(output, dim=1)
-		output = tf.contrib.layers.layer_norm(output, begin_norm_axis=2)
+		output = tf.nn.l2_normalize(output, dim=1)
 		return output, attention_weights
 
 	def save(self, savepath, global_step=None, prefix="ckpt", verbose=False):
@@ -178,7 +269,6 @@ def main(unused_args):
 			print()
 			for i, output_step in enumerate(attention[0]):
 				print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
-			print(attention)
-
+				
 if __name__ == "__main__":
 	app.run(main)
