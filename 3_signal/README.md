@@ -69,7 +69,7 @@ With positional encodings, the model learns way better. By checking the attentio
 
 Sample output from testing the model trained with `--pos_enc`:
 
-```python3
+```
 Input: 
 [[['B']
   ['C']

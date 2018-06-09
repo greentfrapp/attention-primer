@@ -169,7 +169,7 @@ There are two main models that can be trained with the script, with and without 
 
 Sample output from testing the model trained with `--pos_enc`:
 
-```python3
+```
 Input: 
 [[['B']
   ['C']

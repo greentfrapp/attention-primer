@@ -151,7 +151,7 @@ We then allocate more attention on **Values** whose **Keys** align to the **Quer
 
 Extract of the `attention` method from the `AttentionModel` class in the script:
 
-```python
+```python3
 def attention(self, query, key, value):
 	# Equation 1 in Vaswani et al. (2017)
 	# 	Scaled dot product between Query and Keys
