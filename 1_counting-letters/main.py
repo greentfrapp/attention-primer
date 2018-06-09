@@ -15,7 +15,7 @@ flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
 
 # Training parameters
-flags.DEFINE_integer("steps", 1000, "Number of training steps")
+flags.DEFINE_integer("steps", 2000, "Number of training steps")
 flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
 flags.DEFINE_integer("save_every", 50, "Interval between saving model")
 flags.DEFINE_string("savepath", "models/", "Path to save or load model")
@@ -122,7 +122,6 @@ class AttentionModel(object):
 		# 	Residual connection ie. add weighted sum to original query
 		output = weighted_sum + query
 		# 	Layer normalization
-		# output = tf.nn.l2_normalize(output, dim=1)
 		output = tf.contrib.layers.layer_norm(output, begin_norm_axis=2)
 		return output, attention_weights
 
@@ -176,10 +175,10 @@ def main(unused_args):
 			}
 			predictions, attention = sess.run([model.predictions, model.attention_weights], feed_dict)
 			print("\nPrediction: \n{}".format(predictions))
-			print()
+			print("\nEncoder-Decoder Attention: ")
 			for i, output_step in enumerate(attention[0]):
 				print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
-				print(output_step)
+				print([float("{:.3f}".format(step)) for step in output_step])
 
 
 if __name__ == "__main__":

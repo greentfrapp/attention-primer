@@ -21,32 +21,30 @@ Here is a sample output from the script.
 
 ```
 Input: 
-[[['B']
+[[['A']
   ['A']
-  ['B']
-  [' ']
-  ['B']
   ['C']
-  ['A']
+  ['C']
   ['B']
   [' ']
-  [' ']]]
+  ['C']
+  ['C']
+  ['C']
+  ['B']]]
 
 Prediction: 
-[[2 4 1]]
+[[2 2 5]]
 
-Output step 0 attended mainly to Input steps: [1 6]
-[ 0.05928046  0.21078663  0.05928046  0.093059    0.05928046  0.06212783
-  0.21078663  0.05928046  0.093059    0.093059  ]
-Output step 1 attended mainly to Input steps: [0 2 4 7]
-[ 0.1613455   0.04682393  0.1613455   0.071399    0.1613455   0.04677311
-  0.04682393  0.1613455   0.071399    0.071399  ]
-Output step 2 attended mainly to Input steps: [5]
-[ 0.06731109  0.07089685  0.06731109  0.1115749   0.06731109  0.25423717
-  0.07089685  0.06731109  0.1115749   0.1115749 ]
+Encoder-Decoder Attention: 
+Output step 0 attended mainly to Input steps: [0 1]
+[0.232, 0.232, 0.061, 0.061, 0.064, 0.101, 0.061, 0.061, 0.061, 0.064]
+Output step 1 attended mainly to Input steps: [4 9]
+[0.066, 0.066, 0.06, 0.06, 0.232, 0.101, 0.06, 0.06, 0.06, 0.232]
+Output step 2 attended mainly to Input steps: [2 3 6 7 8]
+[0.044, 0.044, 0.152, 0.152, 0.043, 0.066, 0.152, 0.152, 0.152, 0.043]
 ```
 
-For each output step, we see the learned attention being intuitively weighted on the relevant letters. In the above example, output step 0 counts the number of 'A's and attended mainly to input steps 1 and 6, which were the 'A's in the sequence.
+For each output step, we see the learned attention being intuitively weighted on the relevant letters. In the above example, Output Step 0 counts the number of 'A's and attended mainly to Input Steps 0 and 1, which were the 'A's in the sequence.
 
 Just as with a recurrent network, the trained model is able to take in variable sequence lengths, although performance definitely worsens when we deviate from the lengths used in the training set.
 
@@ -55,12 +53,12 @@ Just as with a recurrent network, the trained model is able to take in variable 
 ### Training
 
 ```
-python3 main.py --train
+$ python3 main.py --train
 ```
 
 This trains a model with default parameters:
 
-- Training steps: `--steps=1000`
+- Training steps: `--steps=2000`
 - Batchsize: `--batchsize=100`
 - Learning rate: `--lr=1e-2`
 - Savepath: `--savepath=models/`
@@ -74,7 +72,7 @@ The model will be trained on the Counting Task with default parameters:
 ### Testing
 
 ```
-python3 main.py --test
+$ python3 main.py --test
 ```
 
 This tests the trained model (remember to specify the parameters if the trained model did not use default parameters).
@@ -87,8 +85,17 @@ A model trained with the default parameters works reasonably well with sample le
 
 Also, the model definitely cannot output counts larger than the `--max_len` parameter specified during training, since that is used to specify the number of units in the network for generating the logits.
 
+### Help
+
+```
+$ python3 main.py --help
+```
+
+Run with the `--help` flag to get a list of possible flags.
 
 ## Details
+
+Skip ahead to the **Model** section for details about the Attention mechanism.
 
 ### Input
 
@@ -113,9 +120,11 @@ The embedding for that will be a tensor of shape (1, 4, 3):
 
 ### Output / Labels
 
-Similar to the input, the output predictions consists of sequences of one-hot embeddings ie. we represent the counts as one-hot vectors.
+Similar to the input, the output predictions consists of sequences of one-hot embeddings ie. we represent the counts as one-hot vectors. 
 
 The shape of the predictions is determined by the input parameters. First, the length of the prediction corresponds to the `vocab_size`. Next the dimension of each step in a predicted sequence corresponds to `max_len + 1`.
+
+Hence the output/labels tensor should have a shape of `(batchsize, vocab_size, max_len + 1)`.
 
 *It is `max_len + 1` because the minimum count is 0 and the maximum count is `max_len`. So there are `max_len + 1` possible answers.*
 
@@ -144,28 +153,32 @@ Extract of the `attention` method from the `AttentionModel` class in the script:
 
 ```python
 def attention(self, query, key, value):
-		# Equation 1 in Vaswani et al. (2017)
-		# 	Scaled dot product between Query and Keys
-		output = tf.matmul(query, key, transpose_b=True) / (tf.cast(tf.shape(query)[2], tf.float32) ** 0.5)
-		# 	Softmax to get attention weights
-		attention_weights = tf.nn.softmax(output)
-		# 	Multiply weights by Values
-		weighted_sum = tf.matmul(attention_weights, value)
-		# Following Figure 1 and Section 3.1 in Vaswani et al. (2017)
-		# 	Residual connection ie. add weighted sum to original query
-		output = weighted_sum + query
-		# 	Layer normalization
-		output = tf.nn.l2_normalize(output, dim=1)
-		return output, attention_weights
+	# Equation 1 in Vaswani et al. (2017)
+	# 	Scaled dot product between Query and Keys
+	output = tf.matmul(query, key, transpose_b=True) / (tf.cast(tf.shape(query)[2], tf.float32) ** 0.5)
+	# 	Softmax to get attention weights
+	attention_weights = tf.nn.softmax(output)
+	# 	Multiply weights by Values
+	weighted_sum = tf.matmul(attention_weights, value)
+	# Following Figure 1 and Section 3.1 in Vaswani et al. (2017)
+	# 	Residual connection ie. add weighted sum to original query
+	output = weighted_sum + query
+	# 	Layer normalization
+	output = tf.nn.l2_normalize(output, dim=1)
+	return output, attention_weights
 ```
-
-**Add & Norm**
 
 Following the Transformer architecture by Vaswani et al. (2017), the weighted sum is added back to the **Query** via residual connections (Figure 1 and Section 3.1). The sum of **Query** and weighted sum is then layer-normalized and passed to the next step.
 
 Why do we use the sum of the weighted sum and the original **Query** instead of just the weighted sum?
 
-This is because the **Query** may contain important information that cannot be found in the **Values**. To take a simple example, suppose I have two **Key**/**Value** pairs, `[1 0]:[0 1]` and `[0 1]:[0 1]` ie. two different **Keys** with both having the same **Values**. If my **Query** is `[1 0]`, then my weighted sum will be `[0 1]` ie. the **Value** of **Key** `[1 0]`. If we pass the weighted sum to the next layer, we lose information about the **Query**. The next layer has no way of telling whether my **Query** was `[1 0]` or `[0 1]`. If we instead pass the sum of the weighted sum and the original **Query**, we retain the information since the vector that we pass on can be either `[2 0]` or `[1 1]` (assuming no layer normalization).
+One way of understanding it is because the **Query** may contain important information that cannot be found in the **Values**. To take a simple example, suppose I have two **Key**/**Value** pairs, `[1 0]:[0 1]` and `[0 1]:[0 1]` ie. two different **Keys** `[1 0]` and `[0 1]` with both having the same **Values** `[0 1]` and `[0 1]`. 
+
+If my **Query** is `[1 0]`, then my weighted sum will be `[0 1]` ie. the **Value** of **Key** `[1 0]`. 
+
+On the other hand, if my **Query** is `[0 1]`, my weighted sum will still be `[0 1]` ie. the **Value** of **Key** `[0 1]`. 
+
+If we pass the weighted sum to the next layer, we lose information about the **Query**. The next layer has no way of telling whether my **Query** was `[1 0]` or `[0 1]`. If we instead pass the sum of the weighted sum and the original **Query**, we retain the information since the vector that we pass on can be either `[2 0]` or `[1 1]`.
 
 Now, we need to think about what are our **Queries**, **Keys** and **Values**. 
 
@@ -179,11 +192,11 @@ We will let the model learn the **Queries** tensor, by initializing it as a trai
 
 ```python3
 query = tf.Variable(
-			initial_value=np.zeros((1, self.vocab_size, self.hidden)),
-			trainable=True,
-			dtype=tf.float32,
-			name="query",
-		)
+	initial_value=np.zeros((1, self.vocab_size, self.hidden)),
+	trainable=True,
+	dtype=tf.float32,
+	name="query",
+)
 ```
 
 *Notice the first dimension for `decoder_query` in the code above is 1. This is because we will use `tf.tile` to change it to `batch_size` at runtime.*
@@ -198,11 +211,11 @@ Like the **Queries** tensor, we set the output dimension for both networks to `h
 
 ```python3
 key_val = tf.layers.dense(
-			inputs=self.input,
-			units=self.hidden,
-			activation=None,
-			name="key_val"
-		)
+	inputs=self.input,
+	units=self.hidden,
+	activation=None,
+	name="key_val"
+)
 ```
 
 **Decoding and Softmax**
@@ -213,19 +226,19 @@ We then pass that to a regular feedforward network to get logits of `self.max_le
 
 ```python3
 decoding, self.attention_weights = self.attention(
-			query=tf.tile(query, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
-			key=key_val,
-			value=key_val,
-		)
-		
-		self.logits = tf.layers.dense(
-			inputs=decoding,
-			units=self.max_len + 1,
-			activation=None,
-			name="decoding",
-		)
-		
-		self.predictions = tf.argmax(self.logits, axis=2)
+	query=tf.tile(query, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
+	key=key_val,
+	value=key_val,
+)
+
+self.logits = tf.layers.dense(
+	inputs=decoding,
+	units=self.max_len + 1,
+	activation=None,
+	name="decoding",
+)
+
+self.predictions = tf.argmax(self.logits, axis=2)
 ```
 
 That's mainly it for the short and simplified demo of attention for the counting task!
