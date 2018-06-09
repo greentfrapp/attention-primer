@@ -31,7 +31,7 @@ The output is also a sequence, where each element corresponds to the count of a 
 
 As per Task 1, I implement the Scaled Dot-Product Attention (described in Section 3.2.1 of [Vaswani *et al.* (2017)](https://arxiv.org/abs/1706.03762)) for this task. I also demonstrate a simple case of self-attention in this task.
 
-There are two main models that can be trained with the script, with and without the `--self_att` flag, denoting the whether to use self-attention.
+There are two main models that can be trained with the script, with and without the `--self_att` flag, denoting whether to use self-attention.
 
 ### Without `--self_att`
 

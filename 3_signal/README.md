@@ -33,7 +33,7 @@ In particular, all the 'B's, including the signal, are represented with the same
 
 Since the task here is slightly more complicated, I implement the entire encoder layer, with self-attention (but not multi-head) (see left half of Figure 1 and Section 3.1 in [Vaswani *et al.* (2017)](https://arxiv.org/abs/1706.03762)). For decoding I just implement a simple scaled dot-product attention as per Task 1. There is no self-attention for the decoding.
 
-There are two main models that can be trained with the script, with and without the `--pos_enc` flag, denoting the whether to use positional encodings for the input.
+There are two main models that can be trained with the script, with and without the `--pos_enc` flag, denoting whether to use positional encodings for the input.
 
 More on positional encodings in the Details section.
 

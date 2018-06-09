@@ -97,7 +97,7 @@ The output is also a sequence, where each element corresponds to the count of a 
 
 As per Task 1, I implement the Scaled Dot-Product Attention (described in Section 3.2.1 of [Vaswani *et al.* (2017)](https://arxiv.org/abs/1706.03762)) for this task. I also demonstrate a simple case of self-attention.
 
-There are two main models that can be trained with the script, with and without the `--self_att` flag, denoting the whether to use self-attention.
+There are two main models that can be trained with the script, with and without the `--self_att` flag, denoting whether to use self-attention.
 
 Sample output from testing the model trained with `--self_att`:
 
@@ -165,7 +165,7 @@ In the above case, the first input step is 'B', which means that we have to coun
 
 In particular, all the 'B's, including the signal, are represented with the same vector when passed to the model. This means that the model must learn that the meaning of a 'B' changes, depending on whether it is the first letter or not.
 
-There are two main models that can be trained with the script, with and without the `--pos_enc` flag, denoting the whether to use positional encodings for the input.
+There are two main models that can be trained with the script, with and without the `--pos_enc` flag, denoting whether to use positional encodings for the input.
 
 Sample output from testing the model trained with `--pos_enc`:
 
