@@ -20,13 +20,15 @@ flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
 flags.DEFINE_integer("save_every", 50, "Interval between saving model")
 flags.DEFINE_string("savepath", "models/", "Path to save or load model")
 flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
+flags.DEFINE_float("lr", 1e-2, "Learning rate")
 
 # Model parameters
 flags.DEFINE_integer("hidden", 64, "Hidden dimension in model")
 
 # Task parameters
 flags.DEFINE_integer("max_len", 10, "Maximum input length from toy task")
-flags.DEFINE_integer("vocab_size", 3, "Size of input vocabulary")
+flags.DEFINE_integer("vocab_size", 3, "Size of input vocabulary, not including ' ' (null character)")
+flags.DEFINE_integer("sample_len", 10, "Use this parameter to change sequence length during testing")
 
 
 class Task(object):
@@ -45,15 +47,15 @@ class Task(object):
 	def prettify(self, samples):
 		samples = samples.reshape(-1, self.max_len, self.vocab_size + 1)
 		idx = np.expand_dims(np.argmax(samples, axis=2), axis=2)
-		# This means max vocab_size is 26
 		dictionary = np.array(list(' ' + string.ascii_uppercase))
 		return dictionary[idx]
 
 class AttentionModel(object):
 
-	def __init__(self, sess, max_len=10, vocab_size=3, hidden=64, name="Counter"):
+	def __init__(self, sess, sample_len=10, max_len=10, vocab_size=3, hidden=64, name="Counter"):
 		super(AttentionModel, self).__init__()
 		self.sess = sess
+		self.sample_len = sample_len
 		self.max_len = max_len
 		self.vocab_size = vocab_size
 		self.hidden = hidden
@@ -66,7 +68,7 @@ class AttentionModel(object):
 	def build_model(self):
 
 		self.input = tf.placeholder(
-			shape=(None, self.max_len, self.vocab_size + 1),
+			shape=(None, self.sample_len, self.vocab_size + 1),
 			dtype=tf.float32,
 			name="input",
 		)
@@ -77,34 +79,33 @@ class AttentionModel(object):
 			name="labels",
 		)
 
-		decoder_input = tf.Variable(
+		query = tf.Variable(
 			initial_value=np.zeros((1, self.vocab_size, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
-			name="decoder_input",
+			name="query",
 		)
 
-		encoding = tf.layers.dense(
+		key_val = tf.layers.dense(
 			inputs=self.input,
 			units=self.hidden,
 			activation=None,
-			name="encoding"
+			name="key_val"
 		)
 
-		decoding, self.att_weights = self.attention(
-			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
-			key=encoding,
-			value=encoding,
+		decoding, self.attention_weights = self.attention(
+			query=tf.tile(query, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
+			key=key_val,
+			value=key_val,
 		)
 		
-		decoding = tf.layers.dense(
+		self.logits = tf.layers.dense(
 			inputs=decoding,
 			units=self.max_len + 1,
 			activation=None,
 			name="decoding",
 		)
 
-		self.logits = decoding
 		self.predictions = tf.argmax(self.logits, axis=2)
 		self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.logits))
 		self.optimize = tf.train.AdamOptimizer(1e-2).minimize(self.loss)
@@ -145,7 +146,7 @@ def main(unused_args):
 	if FLAGS.train:
 		tf.gfile.MakeDirs(FLAGS.savepath)
 		with tf.Session() as sess:
-			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
+			model = AttentionModel(sess=sess, sample_len=FLAGS.max_len, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
 			sess.run(tf.global_variables_initializer())
 			task = Task(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
 			for i in np.arange(FLAGS.steps):
@@ -165,20 +166,21 @@ def main(unused_args):
 
 	if FLAGS.test:
 		with tf.Session() as sess:
-			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
+			model = AttentionModel(sess=sess, sample_len=FLAGS.sample_len, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
 			model.load(FLAGS.savepath)
-			task = Task(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
+			task = Task(max_len=FLAGS.sample_len, vocab_size=FLAGS.vocab_size)
 			samples, labels = task.next_batch(batchsize=1)
 			print("\nInput: \n{}".format(task.prettify(samples)))
 			feed_dict = {
 				model.input: samples,
 			}
-			predictions, attention = sess.run([model.predictions, model.att_weights], feed_dict)
+			predictions, attention = sess.run([model.predictions, model.attention_weights], feed_dict)
 			print("\nPrediction: \n{}".format(predictions))
 			print()
 			for i, output_step in enumerate(attention[0]):
 				print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
-			print(attention)
+				print(output_step)
+
 
 if __name__ == "__main__":
 	app.run(main)
