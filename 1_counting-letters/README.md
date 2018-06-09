@@ -186,7 +186,7 @@ Now, we need to think about what are our **Queries**, **Keys** and **Values**.
 
 We want the first step of the output sequence to count the number of 'A's and the second step to count the number of 'B's and so on. Why not have one **Query** vector per output step? The first **Query** vector can check for 'A's and the second **Query** vector can check for 'B's and so on.
 
-In that case, our **Queries** tensor will be of shape (`batch_size`, `vocab_size`, `hidden`). `vocab_size` is the second dimension since we have one **Query** vector for each element in our vocabulary. `hidden` will be the dimension of each **Query** vector.
+In that case, our **Queries** tensor will be of shape `(batch_size, vocab_size, hidden)`. `vocab_size` is the second dimension since we have one **Query** vector for each element in our vocabulary. `hidden` will be the dimension of each **Query** vector.
 
 We will let the model learn the **Queries** tensor, by initializing it as a trainable `tf.Variable`:
 

@@ -1,8 +1,8 @@
 # attention-primer
 
-Some toy tasks/experiments to illustrate the concept of attention in machine learning! In particular, we see how attention can be used in place of RNNs and CNNs for modeling sequences. 
+Some toy tasks/experiments to illustrate the concept of attention in machine learning. In particular, we see how attention can be used in place of RNNs and CNNs for modeling sequences. 
 
-*In the following scripts, no RNN or CNN is employed in the models!*
+*In the following scripts, no RNN or CNN is employed in the models.*
 
 Each task tries to illustrate a subconcept of attention, along with a tutorial/explanation accompanying every task.
 
