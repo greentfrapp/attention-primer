@@ -1,4 +1,4 @@
-# 1 - Counting Letters \***WIP***
+# 1 - Counting Letters
 
 ## Description
 
@@ -21,28 +21,72 @@ Here is a sample output from the script.
 
 ```
 Input: 
-[[[' ']
+[[['B']
   ['A']
-  ['C']
-  ['B']
-  ['B']
-  ['C']
   ['B']
   [' ']
+  ['B']
+  ['C']
   ['A']
-  ['B']]]
+  ['B']
+  [' ']
+  [' ']]]
 
 Prediction: 
-[[2 4 2]]
+[[2 4 1]]
 
-Output step 0 attended mainly to Input steps: [1 8]
-Output step 1 attended mainly to Input steps: [3 4 6 9]
-Output step 2 attended mainly to Input steps: [2 5]
+Output step 0 attended mainly to Input steps: [1 6]
+[ 0.05928046  0.21078663  0.05928046  0.093059    0.05928046  0.06212783
+  0.21078663  0.05928046  0.093059    0.093059  ]
+Output step 1 attended mainly to Input steps: [0 2 4 7]
+[ 0.1613455   0.04682393  0.1613455   0.071399    0.1613455   0.04677311
+  0.04682393  0.1613455   0.071399    0.071399  ]
+Output step 2 attended mainly to Input steps: [5]
+[ 0.06731109  0.07089685  0.06731109  0.1115749   0.06731109  0.25423717
+  0.07089685  0.06731109  0.1115749   0.1115749 ]
 ```
 
-For each output step, we see the learned attention being intuitively weighted on the relevant letters. In the above example, output step 0 counts the number of 'A's and attended mainly to input steps 1 and 8, which were the 'A's in the sequence.
+For each output step, we see the learned attention being intuitively weighted on the relevant letters. In the above example, output step 0 counts the number of 'A's and attended mainly to input steps 1 and 6, which were the 'A's in the sequence.
 
 Just as with a recurrent network, the trained model is able to take in variable sequence lengths, although performance definitely worsens when we deviate from the lengths used in the training set.
+
+## Commands
+
+### Training
+
+```
+python3 main.py --train
+```
+
+This trains a model with default parameters:
+
+- Training steps: `--steps=1000`
+- Batchsize: `--batchsize=100`
+- Learning rate: `--lr=1e-2`
+- Savepath: `--savepath=models/`
+- Encoding dimensions: `--hidden=64`
+
+The model will be trained on the Counting Task with default parameters:
+
+- Max sequence length: `--max_len=10`
+- Vocabulary size: `--vocab_size=3`
+
+### Testing
+
+```
+python3 main.py --test
+```
+
+This tests the trained model (remember to specify the parameters if the trained model did not use default parameters).
+
+In particular, you can modify the test sample's length:
+
+- Sample length: `--sample_len=10`
+
+A model trained with the default parameters works reasonably well with sample lengths of 9 to 11. Shorter or longer sequences will see significant degradation of performance. 
+
+Also, the model definitely cannot output counts larger than the `--max_len` parameter specified during training, since that is used to specify the number of units in the network for generating the logits.
+
 
 ## Details
 
@@ -96,7 +140,7 @@ In scaled dot-product attention, we calculate alignment using the dot product. I
 
 We then allocate more attention on **Values** whose **Keys** align to the **Query**. To do this, we simply multiply the softmax of the dot product by the **Values**. This gives us a weighted sum of the **Values**, where aligned **Keys** contribute more to this weighted sum.
 
-Extract of the `attention` method under the `AttentionModel` class in the script:
+Extract of the `attention` method from the `AttentionModel` class in the script:
 
 ```python
 def attention(self, query, key, value):
@@ -134,11 +178,11 @@ In that case, our **Queries** tensor will be of shape (`batch_size`, `vocab_size
 We will let the model learn the **Queries** tensor, by initializing it as a trainable `tf.Variable`:
 
 ```python3
-decoder_query = tf.Variable(
+query = tf.Variable(
 			initial_value=np.zeros((1, self.vocab_size, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
-			name="decoder_query",
+			name="query",
 		)
 ```
 
@@ -148,8 +192,43 @@ decoder_query = tf.Variable(
 
 Following the above input/output examples, our input is of shape (1, 4, 3) ie. a length-4 sequence of 3-dim vectors, where each vector is a representation of a character. To create **Key**/**Value** pairs for each character, we can simply pass the input into two regular fully-connected feedforward networks - one for generating a **Key** for each character and one for generating a **Value**.
 
-Like the **Queries** tensor, we set the output dimension for both networks to `hidden` where `hidden=64` by default. We then end up with a **Keys** tensor and a **Values** tensor, where both are of shape (1, 4, 64). Each 64-dim vector in the **Keys** tensor corresponds to a 64-dim vector in the **Values** tensor. 
+In fact, we just need one regular fully-connected feedforward network, to generate a **Key**/**Value** for each character ie. the vector acts as both **Key** and **Value**.
 
+Like the **Queries** tensor, we set the output dimension for both networks to `hidden` where `hidden=64` by default. We then end up with a tensor of shape (1, 4, 64). Each 64-dim vector in the tensor acts as both **Key** and **Value** for each character. 
+
+```python3
+key_val = tf.layers.dense(
+			inputs=self.input,
+			units=self.hidden,
+			activation=None,
+			name="key_val"
+		)
+```
+
+**Decoding and Softmax**
+
+All that's left is then to compute the scaled dot-product attention, using the **Queries** tensor and the **Keys**/**Values** tensor.
+
+We then pass that to a regular feedforward network to get logits of `self.max_len + 1` dimensions and we just `tf.argmax` these logits to get the predictions.
+
+```python3
+decoding, self.attention_weights = self.attention(
+			query=tf.tile(query, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
+			key=key_val,
+			value=key_val,
+		)
+		
+		self.logits = tf.layers.dense(
+			inputs=decoding,
+			units=self.max_len + 1,
+			activation=None,
+			name="decoding",
+		)
+		
+		self.predictions = tf.argmax(self.logits, axis=2)
+```
+
+That's all for the short and simplified demo of attention for the counting task!
 
 
 
