@@ -13,7 +13,7 @@ Mainly because it took me awhile to understand attention and I couldn't find a c
 ## Experiments \***WIP***
 
 
-### 1 - Counting Letters
+### [1 - Counting Letters](https://github.com/greentfrapp/attention-primer/tree/master/1_counting-letters)
 
 Consider a sequence, where each element is a randomly selected letter or null/blank. The task is to count how many times each letter appears in the sequence.
 
