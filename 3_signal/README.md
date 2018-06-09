@@ -90,7 +90,7 @@ Encoder-Decoder Attention:
 Output step 0 attended mainly to Input steps: [0]
 [0.41, 0.046, 0.063, 0.045, 0.063, 0.068, 0.067, 0.063, 0.063, 0.045, 0.067]
 
-L2-Norm of Positional Encoding:
+L2-Norm of Input Positional Encoding:
 [0.816, 0.181, 0.183, 0.185, 0.186, 0.18, 0.185, 0.183, 0.185, 0.183, 0.178]
 ```
 
@@ -143,7 +143,7 @@ Encoder-Decoder Attention:
 Output step 0 attended mainly to Input steps: [7]
 [0.08, 0.076, 0.076, 0.076, 0.092, 0.108, 0.108, 0.108, 0.076, 0.108, 0.092]
 
-L2-Norm of Positional Encoding:
+L2-Norm of Input Positional Encoding:
 [0.884, 0.115, 0.119, 0.114, 0.116, 0.12, 0.116, 0.122, 0.118, 0.119, 0.12]
 ```
 
@@ -232,7 +232,7 @@ The output tensor is of shape `(batchsize, 1, max_len + 1)`.
 
 ### Model
 
-**Positional Encodings**
+**Positional Encoding**
 
 We touched on this briefly at the end of Task 1 in the Notes section, where we discussed how the **Queries** tensor is also a form of positional encoding for the output.
 
@@ -279,13 +279,13 @@ With this, an 'A' in one input step is different from an 'A' in another input st
 From model trained with `--pos_enc` and `enc_layers=1`:
 
 ```
-L2-Norm of Positional Encoding:
+L2-Norm of Input Positional Encoding:
 [0.816, 0.181, 0.183, 0.185, 0.186, 0.18, 0.185, 0.183, 0.185, 0.183, 0.178]
 ```
 
 From model trained with `--pos_enc` and `enc_layers=6`:
 
 ```
-L2-Norm of Positional Encoding:
+L2-Norm of Input Positional Encoding:
 [0.884, 0.115, 0.119, 0.114, 0.116, 0.12, 0.116, 0.122, 0.118, 0.119, 0.12]
 ```

@@ -227,7 +227,7 @@ def main(unused_args):
 				print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
 				print([float("{:.3f}".format(step)) for step in output_step])
 			if FLAGS.pos_enc:
-				print("\nL2-Norm of Positional Encodings:")
+				print("\nL2-Norm of Input Positional Encoding:")
 				print([float("{:.3f}".format(step)) for step in np.linalg.norm(pos_enc, ord=2, axis=2)[0]])
 
 
