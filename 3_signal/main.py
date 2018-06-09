@@ -1,5 +1,6 @@
 """
-Toy experiment to illustrate counting using Self-Attention
+Task 3 - Signal
+Demonstration of positional encodings
 """
 
 import tensorflow as tf
@@ -15,19 +16,21 @@ flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
 
 # Training parameters
-flags.DEFINE_integer("steps", 1000, "Number of training steps")
+flags.DEFINE_integer("steps", 2000, "Number of training steps")
 flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
 flags.DEFINE_integer("save_every", 50, "Interval between saving model")
 flags.DEFINE_string("savepath", "models/", "Path to save or load model")
 flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
 
 # Model parameters
+flags.DEFINE_bool("pos_enc", False, "Whether to use positional encodings")
+flags.DEFINE_integer("enc_layers", 1, "Number of self-attention layers for encodings")
 flags.DEFINE_integer("hidden", 64, "Hidden dimension in model")
 
 # Task parameters
 flags.DEFINE_integer("max_len", 10, "Maximum input length from toy task")
 flags.DEFINE_integer("vocab_size", 3, "Size of input vocabulary")
-flags.DEFINE_string("signal", None, "Signal for task")
+flags.DEFINE_string("signal", None, "Control signal character for test sample")
 
 
 class Task(object):
@@ -41,30 +44,32 @@ class Task(object):
 	def next_batch(self, batchsize=100, signal=None):
 		if signal is not None:
 			signal = string.ascii_uppercase.index(signal)
-			signal = np.eye(2 * self.vocab_size)[np.ones((batchsize, 1), dtype=int) * signal]
+			signal = np.eye(self.vocab_size)[np.ones((batchsize, 1), dtype=int) * signal]
 		else:
-			signal = np.eye(2 * self.vocab_size)[np.random.choice(np.arange(self.vocab_size), [batchsize, 1])]
-		seq = np.eye(2 * self.vocab_size)[np.random.choice(np.arange(self.vocab_size, 2 * self.vocab_size), [batchsize, self.max_len])]
+			signal = np.eye(self.vocab_size)[np.random.choice(np.arange(self.vocab_size), [batchsize, 1])]
+		seq = np.eye(self.vocab_size)[np.random.choice(np.arange(self.vocab_size), [batchsize, self.max_len])]
 		x = np.concatenate((signal, seq), axis=1)
-		y = np.expand_dims(np.eye(self.max_len + 1)[np.sum(np.argmax(signal, axis=2) == (np.argmax(seq, axis=2) - (self.vocab_size)), axis=1)], axis=1)
+		y = np.expand_dims(np.eye(self.max_len + 1)[np.sum(np.argmax(signal, axis=2) == (np.argmax(seq, axis=2)), axis=1)], axis=1)
 		return x, y
 
 	def prettify(self, samples):
-		samples = samples.reshape(-1, self.max_len + 1, 2 * self.vocab_size)
+		samples = samples.reshape(-1, self.max_len + 1, self.vocab_size)
 		idx = np.expand_dims(np.argmax(samples, axis=2), axis=2)
 		# This means max vocab_size is 26
-		dictionary = np.array(list(string.ascii_uppercase[:self.vocab_size] + string.ascii_uppercase))
+		dictionary = np.array(list(string.ascii_uppercase))
 		return dictionary[idx]
 
 class AttentionModel(object):
 
-	def __init__(self, sess, max_len=10, vocab_size=3, hidden=64, name="Counter"):
+	def __init__(self, sess, max_len=10, vocab_size=3, hidden=64, name="Signal", pos_enc=True, enc_layers=1):
 		super(AttentionModel, self).__init__()
 		self.sess = sess
 		self.max_len = max_len
 		self.vocab_size = vocab_size
 		self.hidden = hidden
 		self.name = name
+		self.pos_enc = pos_enc
+		self.enc_layers = enc_layers
 		with tf.variable_scope(self.name):
 			self.build_model()
 			variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.name)
@@ -73,7 +78,7 @@ class AttentionModel(object):
 	def build_model(self):
 
 		self.input = tf.placeholder(
-			shape=(None, self.max_len + 1, 2 * self.vocab_size),
+			shape=(None, self.max_len + 1, self.vocab_size),
 			dtype=tf.float32,
 			name="input",
 		)
@@ -84,12 +89,12 @@ class AttentionModel(object):
 			name="labels",
 		)
 
-		# input_positional_coding = tf.Variable(
-		# 	initial_value=np.zeros((1, self.max_len + 1, self.hidden)),
-		# 	trainable=True,
-		# 	dtype=tf.float32,
-		# 	name="input_positional_coding"
-		# )
+		self.pos_enc = input_positional_encoding = tf.Variable(
+			initial_value=np.zeros((1, self.max_len + 1, self.hidden)),
+			trainable=True,
+			dtype=tf.float32,
+			name="input_positional_coding"
+		)
 
 		decoder_input = tf.Variable(
 			initial_value=np.zeros((1, 1, self.hidden)),
@@ -106,127 +111,29 @@ class AttentionModel(object):
 			name="encoding"
 		)
 
-		# Add positional encodings
-		# encoding += tf.tile(input_positional_coding, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0))
-		# encoding += input_positional_coding
+		if self.pos_enc:
+			# Add positional encodings
+			encoding += input_positional_encoding
 
-		# Encoder Layer 1
-		encoding, self.enc_weights_1 = self.attention(
-			query=encoding,
-			key=encoding,
-			value=encoding,
-		)
-		dense = tf.layers.dense(
-			inputs=encoding,
-			units=self.hidden * 2,
-			activation=tf.nn.relu,
-			name="encoder_layer1_dense1"
-		)
-		encoding += tf.layers.dense(
-			inputs=dense,
-			units=self.hidden,
-			activation=None,
-			name="encoder_layer1_dense2"
-		)
-		encoding = tf.contrib.layers.layer_norm(encoding, begin_norm_axis=2)
-
-		# Encoder Layer 2
-		encoding, self.enc_weights_2 = self.attention(
-			query=encoding,
-			key=encoding,
-			value=encoding,
-		)
-		dense = tf.layers.dense(
-			inputs=encoding,
-			units=self.hidden * 2,
-			activation=tf.nn.relu,
-			name="encoder_layer2_dense1"
-		)
-		encoding += tf.layers.dense(
-			inputs=dense,
-			units=self.hidden,
-			activation=None,
-			name="encoder_layer2_dense2"
-		)
-		encoding = tf.contrib.layers.layer_norm(encoding, begin_norm_axis=2)
-
-		# Encoder Layer 2
-		encoding, self.enc_weights_2 = self.attention(
-			query=encoding,
-			key=encoding,
-			value=encoding,
-		)
-		dense = tf.layers.dense(
-			inputs=encoding,
-			units=self.hidden * 2,
-			activation=tf.nn.relu,
-			name="encoder_layer3_dense1"
-		)
-		encoding += tf.layers.dense(
-			inputs=dense,
-			units=self.hidden,
-			activation=None,
-			name="encoder_layer3_dense2"
-		)
-		encoding = tf.contrib.layers.layer_norm(encoding, begin_norm_axis=2)
-
-		encoding, self.enc_weights_2 = self.attention(
-			query=encoding,
-			key=encoding,
-			value=encoding,
-		)
-		dense = tf.layers.dense(
-			inputs=encoding,
-			units=self.hidden * 2,
-			activation=tf.nn.relu,
-			name="encoder_layer4_dense1"
-		)
-		encoding += tf.layers.dense(
-			inputs=dense,
-			units=self.hidden,
-			activation=None,
-			name="encoder_layer4_dense2"
-		)
-		encoding = tf.contrib.layers.layer_norm(encoding, begin_norm_axis=2)
-
-		# Decoder Layer 1
-		decoding, self.attention_weights = self.attention(
-			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
-			key=encoding,
-			value=encoding,
-		)
-		dense = tf.layers.dense(
-			inputs=decoding,
-			units=self.hidden * 2,
-			activation=tf.nn.relu,
-			name="decoder_layer1_dense1"
-		)
-		decoding += tf.layers.dense(
-			inputs=dense,
-			units=self.hidden,
-			activation=None,
-			name="decoder_layer1_dense2"
-		)
-		decoding = tf.contrib.layers.layer_norm(decoding, begin_norm_axis=2)
-
-		decoding, self.attention_weights = self.attention(
-			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
-			key=encoding,
-			value=encoding,
-		)
-		dense = tf.layers.dense(
-			inputs=decoding,
-			units=self.hidden * 2,
-			activation=tf.nn.relu,
-			name="decoder_layer2_dense1"
-		)
-		decoding += tf.layers.dense(
-			inputs=dense,
-			units=self.hidden,
-			activation=None,
-			name="decoder_layer2_dense2"
-		)
-		decoding = tf.contrib.layers.layer_norm(decoding, begin_norm_axis=2)
+		for i in np.arange(self.enc_layers):
+			encoding, _ = self.attention(
+				query=encoding,
+				key=encoding,
+				value=encoding,
+			)
+			dense = tf.layers.dense(
+				inputs=encoding,
+				units=self.hidden * 2,
+				activation=tf.nn.relu,
+				name="encoder_layer{}_dense1".format(i + 1)
+			)
+			encoding += tf.layers.dense(
+				inputs=dense,
+				units=self.hidden,
+				activation=None,
+				name="encoder_layer{}_dense2".format(i + 1)
+			)
+			encoding = tf.contrib.layers.layer_norm(encoding, begin_norm_axis=2)
 
 		decoding, self.attention_weights = self.attention(
 			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
@@ -282,7 +189,7 @@ def main(unused_args):
 	if FLAGS.train:
 		tf.gfile.MakeDirs(FLAGS.savepath)
 		with tf.Session() as sess:
-			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
+			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers)
 			sess.run(tf.global_variables_initializer())
 			task = Task(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
 			for i in np.arange(FLAGS.steps):
@@ -302,40 +209,27 @@ def main(unused_args):
 
 	if FLAGS.test:
 		with tf.Session() as sess:
-			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden)
+			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers)
 			model.load(FLAGS.savepath)
 			task = Task(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
 			samples, labels = task.next_batch(batchsize=1, signal=FLAGS.signal)
-			# print(samples)
-			# print(labels)
 			print("\nInput: \n{}".format(task.prettify(samples)))
 			feed_dict = {
 				model.input: samples,
 			}
-			predictions, attention = sess.run([model.predictions, model.attention_weights], feed_dict)
+			if FLAGS.pos_enc:
+				predictions, attention, pos_enc = sess.run([model.predictions, model.attention_weights, model.pos_enc], feed_dict)
+			else:
+				predictions, attention = sess.run([model.predictions, model.attention_weights], feed_dict)
 			print("\nPrediction: \n{}".format(predictions))
-			print()
-			# print(a)
-			# print(b)
-			print(attention)
-			# print(attention_2)
-			# print(attention_3)
-			# print(attention_4)
-			# print(attention_5)
-			# print(attention_6)
-			# print(np.mean(np.concatenate((attention, attention_2, attention_3, attention_4, attention_5, attention_6), axis=1), axis=1))
-			# for i, output_step in enumerate(attention_3[0]):
-			# 	print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
+			print("\nEncoder-Decoder Attention: ")
+			for i, output_step in enumerate(attention[0]):
+				print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
+				print([float("{:.3f}".format(step)) for step in output_step])
+			if FLAGS.pos_enc:
+				print("\nL2-Norm of Positional Encodings:")
+				print([float("{:.3f}".format(step)) for step in np.linalg.norm(pos_enc, ord=2, axis=2)[0]])
 
-
-def test():
-	task = Task()
-	x, y = task.next_batch(1)
-	print(task.prettify(x))
-	# print(x)
-	print(np.argmax(y))
-	quit()
 
 if __name__ == "__main__":
-	# test()
 	app.run(main)

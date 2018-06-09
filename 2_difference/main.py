@@ -1,5 +1,6 @@
 """
-Toy experiment to illustrate counting using Self-Attention
+Task 2 - Difference
+Demonstration of self-attention and using it for modeling intra-sequence dependencies
 """
 
 import tensorflow as tf
@@ -15,7 +16,6 @@ flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
 
 # Training parameters
-flags.DEFINE_bool("self_att", False, "Whether to use self-attention for decoding")
 flags.DEFINE_integer("steps", 1000, "Number of training steps")
 flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
 flags.DEFINE_integer("save_every", 50, "Interval between saving model")
@@ -23,6 +23,7 @@ flags.DEFINE_string("savepath", "models/", "Path to save or load model")
 flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
 
 # Model parameters
+flags.DEFINE_bool("self_att", False, "Whether to use self-attention for decoding")
 flags.DEFINE_integer("hidden", 64, "Hidden dimension in model")
 
 # Task parameters

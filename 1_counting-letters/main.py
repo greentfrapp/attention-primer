@@ -1,5 +1,6 @@
 """
-Toy experiment to illustrate counting using Self-Attention
+Task 1 - Counting Letters
+Simple implementation of attention and tutorial on queries, keys and values
 """
 
 import tensorflow as tf
