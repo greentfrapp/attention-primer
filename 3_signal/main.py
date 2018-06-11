@@ -89,7 +89,7 @@ class AttentionModel(object):
 			name="labels",
 		)
 
-		self.pos_enc = input_positional_encoding = tf.Variable(
+		self.input_pos_enc = input_positional_encoding = tf.Variable(
 			initial_value=np.zeros((1, self.max_len + 1, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
@@ -218,7 +218,7 @@ def main(unused_args):
 				model.input: samples,
 			}
 			if FLAGS.pos_enc:
-				predictions, attention, pos_enc = sess.run([model.predictions, model.attention_weights, model.pos_enc], feed_dict)
+				predictions, attention, input_pos_enc = sess.run([model.predictions, model.attention_weights, model.input_pos_enc], feed_dict)
 			else:
 				predictions, attention = sess.run([model.predictions, model.attention_weights], feed_dict)
 			print("\nPrediction: \n{}".format(predictions))
@@ -228,7 +228,7 @@ def main(unused_args):
 				print([float("{:.3f}".format(step)) for step in output_step])
 			if FLAGS.pos_enc:
 				print("\nL2-Norm of Input Positional Encoding:")
-				print([float("{:.3f}".format(step)) for step in np.linalg.norm(pos_enc, ord=2, axis=2)[0]])
+				print([float("{:.3f}".format(step)) for step in np.linalg.norm(input_pos_enc, ord=2, axis=2)[0]])
 
 
 if __name__ == "__main__":
