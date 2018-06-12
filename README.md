@@ -202,3 +202,81 @@ Here the L2-Norm of the positional vector is far larger for the first step (0.81
 
 Refer to the task's [README](https://github.com/greentfrapp/attention-primer/tree/master/3_signal) for more details.
 
+### [4 - Signal 2](https://github.com/greentfrapp/attention-primer/tree/master/4_signal2)
+
+**In this task, we show the advantages afforded by multihead-attention.**
+
+Consider a sequence, where each element is a randomly selected letter. We call the first three elements the *signals*. 
+
+For example ('C', 'B', 'B' are the signals here):
+
+```
+Input:
+['C'], ['B'], ['B'], ['B'], ['A'], ['B'], ['C']
+Output:
+[[1, 2, 2]]
+```
+
+The output is a sequence of three steps, corresponding to the count of the letter specified by each signal (first three input steps).
+
+In the above case, the first input step is 'C', which means that we have to count the number of 'C's in the following sequence. The output is hence 1, since there is 1 'C' in the sequence (not counting the signal).
+
+Likewise, for the second and third signals. Also, note that signals can be repeated, like the repeated 'B' signals in the example above.
+
+Sample output from testing the model trained with `--multihead=True`:
+
+```
+Input:
+[[['B']
+  ['C']
+  ['C']
+  ['C']
+  ['B']
+  ['A']
+  ['A']
+  ['B']
+  ['A']
+  ['C']
+  ['C']
+  ['C']
+  ['A']]]
+
+Prediction:
+[[2 4 4]]
+
+Encoder-Decoder Attention:
+Attention of Output step 0 on Input steps
+    Head #0
+    [0.09, 0.091, 0.076, 0.065, 0.065, 0.088, 0.089, 0.065, 0.088, 0.065, 0.064, 0.064, 0.088]
+    Head #1
+    [0.459, 0.088, 0.095, 0.034, 0.052, 0.032, 0.029, 0.051, 0.03, 0.033, 0.033, 0.034, 0.03]
+    Head #2
+    [0.128, 0.003, 0.044, 0.003, 0.244, 0.084, 0.077, 0.239, 0.084, 0.003, 0.003, 0.003, 0.084]
+    Head #3
+    [0.023, 0.002, 0.062, 0.064, 0.029, 0.156, 0.149, 0.029, 0.15, 0.062, 0.062, 0.065, 0.149]
+Attention of Output step 1 on Input steps
+    Head #0
+    [0.097, 0.189, 0.018, 0.076, 0.085, 0.057, 0.057, 0.085, 0.057, 0.074, 0.075, 0.074, 0.056]
+    Head #1
+    [0.023, 0.757, 0.001, 0.039, 0.016, 0.009, 0.01, 0.016, 0.01, 0.037, 0.038, 0.036, 0.009]
+    Head #2
+    [0.107, 0.037, 0.078, 0.035, 0.13, 0.095, 0.093, 0.129, 0.095, 0.035, 0.035, 0.035, 0.095]
+    Head #3
+    [0.055, 0.024, 0.076, 0.077, 0.06, 0.106, 0.104, 0.059, 0.105, 0.077, 0.076, 0.078, 0.104]
+Attention of Output step 2 on Input steps
+    Head #0
+    [0.006, 0.001, 0.695, 0.009, 0.004, 0.063, 0.063, 0.004, 0.061, 0.01, 0.009, 0.009, 0.066]
+    Head #1
+    [0.023, 0.0, 0.782, 0.006, 0.018, 0.035, 0.031, 0.018, 0.033, 0.007, 0.006, 0.007, 0.034]
+    Head #2
+    [0.117, 0.0, 0.023, 0.0, 0.316, 0.061, 0.053, 0.305, 0.061, 0.0, 0.0, 0.0, 0.061]
+    Head #3
+    [0.008, 0.0, 0.042, 0.044, 0.012, 0.198, 0.184, 0.011, 0.187, 0.042, 0.042, 0.046, 0.184]
+
+L2-Norm of Input Positional Encoding:
+[1.47, 1.564, 1.911, 0.295, 0.287, 0.292, 0.299, 0.286, 0.291, 0.293, 0.289, 0.291, 0.29]
+```
+
+The output shows three sets of attention, one for each step of the output sequence. For each step, there are also four subsets of attention, each corresponding to a head.
+
+Refer to the task's [README](https://github.com/greentfrapp/attention-primer/tree/master/4_signal2) for more details.

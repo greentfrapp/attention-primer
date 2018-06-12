@@ -222,10 +222,11 @@ After multiplying the **Queries**, **Keys** and **Values** by their respective w
 
 We then proceed to do regular scaled dot-product attention with each of the 4 sets of **Queries**, **Keys** and **Values** tensors. We will then end up with 4 outputs, each of shape `(batchsize, length, 16)`. We concatenate these outputs along the last dimension, which gives us a large tensor of shape `(batchsize, length, 16*4=64)`. Notice that we get back `hidden` as the last dimension ie. the shape is also `(batchsize, length, hidden)`.
 
-We then construct a output weight tensor of shape `(hidden, hidden)` and multiply the concatenated output with this weight tensor to obtain our final multihead output of shape `(batchsize, length, hidden)`.
+Finally we construct a output weight tensor of shape `(hidden, hidden)` and multiply the concatenated output with this weight tensor to obtain our final multihead output of shape `(batchsize, length, hidden)`.
 
-Notes:
+The primary advantage of using multihead-attention is the additional complexity/capacity due to two main factors.
 
-- h can actually be nonfactor of hidden eg. 5 but we need to adjust the output weight tensor
-- The weight tensors are similar to feedforward networks but without the bias and activation
-- We get to do h variations of attentions 
+1. The additional linear mappings from multiplying by the learned weight tensors (notice the weight tensors are similar to feedforward networks but without bias and activation)
+2. In each multihead-attention layer, instead of just a single attention, we get to perform and aggregate over `h` variations of attention
+
+On a last note, while Vaswani et. al (2017) and this script defines `h` as a factor of `hidden`, it is actually possible to use any `h` and each weight tensor can be of shape `(hidden, d)` where `d` can be any size. The only consideration is that the output weight tensor has to be of shape `(h * d, hidden)` so that the final multihead output is still of shape `(batchsize, length, hidden)`.
