@@ -16,7 +16,7 @@ For example ('C', 'B', 'B' are the signals here):
 Input:
 ['C'], ['B'], ['B'], ['B'], ['A'], ['B'], ['C']
 Output:
-[[1, 2, 2]]
+[[1], [2], [2]]
 ```
 
 The output is a sequence of three steps, corresponding to the count of the letter specified by each signal (first three input steps).
