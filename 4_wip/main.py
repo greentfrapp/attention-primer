@@ -23,7 +23,8 @@ flags.DEFINE_string("savepath", "models/", "Path to save or load model")
 flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
 
 # Model parameters
-flags.DEFINE_integer("multihead", 4, "Number of heads for multihead attention")
+flags.DEFINE_bool("multihead", True, "Whether to use multihead or vanilla attention")
+flags.DEFINE_integer("heads", 4, "Number of heads for multihead attention")
 flags.DEFINE_bool("pos_enc", False, "Whether to use positional encodings")
 flags.DEFINE_integer("enc_layers", 1, "Number of self-attention layers for encodings")
 flags.DEFINE_integer("hidden", 64, "Hidden dimension in model")
@@ -47,14 +48,14 @@ class Task(object):
 			signal = string.ascii_uppercase.index(signal)
 			signal = np.eye(self.vocab_size)[np.ones((batchsize, 1), dtype=int) * signal]
 		else:
-			signal = np.eye(self.vocab_size)[np.random.choice(np.arange(self.vocab_size), [batchsize, 1])]
+			signal = np.eye(self.vocab_size)[np.random.choice(np.arange(self.vocab_size), [batchsize, 3])]
 		seq = np.eye(self.vocab_size)[np.random.choice(np.arange(self.vocab_size), [batchsize, self.max_len])]
 		x = np.concatenate((signal, seq), axis=1)
-		y = np.expand_dims(np.eye(self.max_len + 1)[np.sum(np.argmax(signal, axis=2) == (np.argmax(seq, axis=2)), axis=1)], axis=1)
+		y = np.eye(self.max_len + 1)[np.sum(np.expand_dims(np.argmax(signal,axis=2),axis=-1) == np.expand_dims(np.argmax(seq, axis=2), axis=1), axis=2)]
 		return x, y
 
 	def prettify(self, samples):
-		samples = samples.reshape(-1, self.max_len + 1, self.vocab_size)
+		samples = samples.reshape(-1, self.max_len + 3, self.vocab_size)
 		idx = np.expand_dims(np.argmax(samples, axis=2), axis=2)
 		# This means max vocab_size is 26
 		dictionary = np.array(list(string.ascii_uppercase))
@@ -62,7 +63,7 @@ class Task(object):
 
 class AttentionModel(object):
 
-	def __init__(self, sess, max_len=10, vocab_size=3, hidden=64, name="Signal", pos_enc=True, enc_layers=1, multihead=4):
+	def __init__(self, sess, max_len=10, vocab_size=3, hidden=64, name="Signal", pos_enc=True, enc_layers=1, use_multihead=True, heads=4):
 		super(AttentionModel, self).__init__()
 		self.sess = sess
 		self.max_len = max_len
@@ -71,7 +72,8 @@ class AttentionModel(object):
 		self.name = name
 		self.pos_enc = pos_enc
 		self.enc_layers = enc_layers
-		self.multihead = multihead
+		self.use_multihead = use_multihead
+		self.heads = heads
 		with tf.variable_scope(self.name):
 			self.build_model()
 			variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.name)
@@ -80,26 +82,26 @@ class AttentionModel(object):
 	def build_model(self):
 
 		self.input = tf.placeholder(
-			shape=(None, self.max_len + 1, self.vocab_size),
+			shape=(None, self.max_len + 3, self.vocab_size),
 			dtype=tf.float32,
 			name="input",
 		)
 
 		self.labels = tf.placeholder(
-			shape=(None, 1, self.max_len + 1),
+			shape=(None, 3, self.max_len + 1),
 			dtype=tf.float32,
 			name="labels",
 		)
 
 		self.input_pos_enc = input_positional_encoding = tf.Variable(
-			initial_value=tf.zeros((1, self.max_len + 1, self.hidden)),
+			initial_value=tf.zeros((1, self.max_len + 3, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
 			name="input_positional_coding"
 		)
 
 		decoder_input = tf.Variable(
-			initial_value=tf.zeros((1, 1, self.hidden)),
+			initial_value=tf.zeros((1, 3, self.hidden)),
 			trainable=True,
 			dtype=tf.float32,
 			name="decoder_input",
@@ -118,12 +120,19 @@ class AttentionModel(object):
 			encoding += input_positional_encoding
 
 		for i in np.arange(self.enc_layers):
-			encoding, self.self_attention = self.multihead_attention(
-				query=encoding,
-				key=encoding,
-				value=encoding,
-				h=self.multihead,
-			)
+			if self.use_multihead:
+				encoding, _ = self.multihead_attention(
+					query=encoding,
+					key=encoding,
+					value=encoding,
+					h=self.heads,
+				)
+			else:
+				encoding, _ = self.attention(
+					query=encoding,
+					key=encoding,
+					value=encoding
+				)
 			dense = tf.layers.dense(
 				inputs=encoding,
 				units=self.hidden * 2,
@@ -138,12 +147,19 @@ class AttentionModel(object):
 			)
 			encoding = tf.contrib.layers.layer_norm(encoding, begin_norm_axis=2)
 
-		decoding, self.attention_weights = self.multihead_attention(
-			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
-			key=encoding,
-			value=encoding,
-			h=self.multihead,
-		)
+		if self.use_multihead:
+			decoding, self.attention_weights = self.multihead_attention(
+				query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
+				key=encoding,
+				value=encoding,
+				h=self.heads,
+			)
+		else:
+			decoding, self.attention_weights = self.attention(
+				query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
+				key=encoding,
+				value=encoding,
+			)
 
 		decoding = tf.layers.dense(
 			inputs=decoding,
@@ -175,19 +191,16 @@ class AttentionModel(object):
 
 	def multihead_attention(self, query, key, value, h=4):
 		W_query = tf.Variable(
-			# initial_value=tf.random_normal((1, h, tf.cast(tf.shape(query)[1], tf.int32), int(self.hidden / h)), stddev=1e-2),
 			initial_value=tf.random_normal((1, h, self.hidden, int(self.hidden / h)), stddev=1e-2),
 			trainable=True,
 			dtype=tf.float32,
 		)
 		W_key = tf.Variable(
-			# initial_value=tf.random_normal((1, h, tf.cast(tf.shape(key)[1], tf.int32), self.hidden / h), stddev=1e-2),
 			initial_value=tf.random_normal((1, h, self.hidden, int(self.hidden / h)), stddev=1e-2),
 			trainable=True,
 			dtype=tf.float32,
 		)
 		W_value = tf.Variable(
-			# initial_value=tf.random_normal((1, h, tf.cast(tf.shape(value)[1], tf.int32), self.hidden / h), stddev=1e-2),
 			initial_value=tf.random_normal((1, h, self.hidden, int(self.hidden / h)), stddev=1e-2),
 			trainable=True,
 			dtype=tf.float32,
@@ -230,7 +243,7 @@ def main(unused_args):
 	if FLAGS.train:
 		tf.gfile.MakeDirs(FLAGS.savepath)
 		with tf.Session() as sess:
-			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers, multihead=FLAGS.multihead)
+			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers, use_multihead=FLAGS.multihead, heads=FLAGS.heads)
 			sess.run(tf.global_variables_initializer())
 			task = Task(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
 			for i in np.arange(FLAGS.steps):
@@ -250,7 +263,7 @@ def main(unused_args):
 
 	if FLAGS.test:
 		with tf.Session() as sess:
-			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers, multihead=FLAGS.multihead)
+			model = AttentionModel(sess=sess, max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers, use_multihead=FLAGS.multihead, heads=FLAGS.heads)
 			model.load(FLAGS.savepath)
 			task = Task(max_len=FLAGS.max_len, vocab_size=FLAGS.vocab_size)
 			samples, labels = task.next_batch(batchsize=1, signal=FLAGS.signal)
@@ -259,19 +272,25 @@ def main(unused_args):
 				model.input: samples,
 			}
 			if FLAGS.pos_enc:
-				predictions, attention, input_pos_enc, selfatt = sess.run([model.predictions, model.attention_weights, model.input_pos_enc, model.self_attention], feed_dict)
+				predictions, attention, input_pos_enc = sess.run([model.predictions, model.attention_weights, model.input_pos_enc], feed_dict)
 			else:
 				predictions, attention = sess.run([model.predictions, model.attention_weights], feed_dict)
 			print("\nPrediction: \n{}".format(predictions))
 			print("\nEncoder-Decoder Attention: ")
-			print(attention)
-			# for i, output_step in enumerate(attention[0]):
-			# 	print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
-			# 	print([float("{:.3f}".format(step)) for step in output_step])
+			if FLAGS.multihead:
+				for h, head in enumerate(attention[0]):
+					print("Head #{}".format(h))
+					for i, output_step in enumerate(head):
+						print("\tAttention of Output step {} to Input steps".format(i))
+						print("\t{}".format([float("{:.3f}".format(step)) for step in output_step]))
+			else:
+				for i, output_step in enumerate(attention[0]):
+					print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
+					print([float("{:.3f}".format(step)) for step in output_step])
 			if FLAGS.pos_enc:
 				print("\nL2-Norm of Input Positional Encoding:")
 				print([float("{:.3f}".format(step)) for step in np.linalg.norm(input_pos_enc, ord=2, axis=2)[0]])
-			# print(selfatt)
+
 
 if __name__ == "__main__":
 	app.run(main)
