@@ -243,10 +243,10 @@ self.predictions = tf.argmax(self.logits, axis=2)
 
 That's mainly it for the short and simplified demo of attention for the counting task!
 
-Here's a summary figure for the algorithm used in this Task.
+Here's a summary figure for the algorithm used in this Task!
 
 <div>
-<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/1_counting-letters/images/task_1.png" alt="task_1" width="500px" height="whatever" style="display: block;">
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/1_counting-letters/images/task_1.png" alt="task_1" width="800px" height="whatever" style="display: block;">
 </div>
 
 ## Notes
