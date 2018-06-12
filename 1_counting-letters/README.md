@@ -243,6 +243,12 @@ self.predictions = tf.argmax(self.logits, axis=2)
 
 That's mainly it for the short and simplified demo of attention for the counting task!
 
+Here's a summary figure for the algorithm used in this Task.
+
+<div>
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/1_counting-letters/images/task_1.png" alt="task_1" width="500px" height="whatever" style="display: block;">
+</div>
+
 ## Notes
 
 If you look at the attention weights printed out when testing the model, you will notice that the same characters are assigned the same weights. That does not seem correct when you consider, for example, language processing - the same words in different positions should be accorded different weights.
