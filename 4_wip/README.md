@@ -2,164 +2,136 @@
 
 ## Preface
 
-At the end of Task 1, we mentioned that the order of the input sequence does not matter, since we are just counting letters (see Task 1 Notes section).
+The output of Task 3 consists of sequences of length 1, which is somewhat trivial. Task 4 is an extension to Task 3, where there are three signals instead of one, which leads to an output sequence of length 3, where each step corresponds to one signal.
 
-Here, we consider a task where the order of the input sequence is paramount. Specifically, the first step of the input sequence acts as a signal to tell the model which letter to count.
-
-The output is a sequence of a single step, which represents the count of the letter specified by the signal.
-
-For instance, if the first step (signal) is 'A', the model should output the counts of 'A's, not including the signal. 
-
-The model has to learn to recognize the signal purely by its position, since no other information is available ie. the signal for 'A' is identical to a regular 'A' in the sequence. This is similar to language processing, where the identical words can have vastly different meanings in different positions/contexts.
+With the increased complexity of this task, we introduce multihead-attention, which will demonstrate a far larger capacity compared to attention with a single head.
 
 ## Description
 
-Consider a sequence, where each element is a randomly selected letter. We call the first element the *signal*. 
+Consider a sequence, where each element is a randomly selected letter. We call the first three elements the *signals*. 
 
-For example ('B' is the signal here):
+For example ('C', 'B', 'B' are the signals here):
 
 ```
 Input:
-['B'], ['B'], ['A'], ['B'], ['C']
+['C'], ['B'], ['B'], ['B'], ['A'], ['B'], ['C']
 Output:
-[[2]]
+[[1, 2, 2]]
 ```
 
-The output is a sequence of one step, corresponding to the count of the letter specified by the signal (first input step).
+The output is a sequence of three steps, corresponding to the count of the letter specified by each signal (first three input steps).
 
-In the above case, the first input step is 'B', which means that we have to count the number of 'B's in the following sequence. The output is hence 2, since there are 2 'B's in the sequence (not counting the signal).
+In the above case, the first input step is 'C', which means that we have to count the number of 'C's in the following sequence. The output is hence 1, since there is 1 'C' in the sequence (not counting the signal).
 
-In particular, all the 'B's, including the signal, are represented with the same vector when passed to the model. This means that the model must learn that the meaning of a 'B' changes, depending on whether it is the first letter or not.
+Likewise, for the second and third signals. Also, note that signals can be repeated, like the repeated 'B' signals in the example above.
 
-Since the task here is slightly more complicated, I implement the entire encoder layer, with self-attention (but not multi-head) (see left half of Figure 1 and Section 3.1 in [Vaswani *et al.* (2017)](https://arxiv.org/abs/1706.03762)). For decoding I just implement a simple scaled dot-product attention as per Task 1. There is no self-attention for the decoding.
+I implement the entire encoder layer, with multihead-self-attention (see left half of Figure 1 and Section 3.1 in [Vaswani *et al.* (2017)](https://arxiv.org/abs/1706.03762)). For decoding I just implement a single multihead-attention layer. There is no self-attention for the decoding. In all attention layers, the number of heads used is `--heads=4` by default. The `--pos_enc` flag is enabled by default as well.
 
-There are two main models that can be trained with the script, with and without the `--pos_enc` flag, denoting whether to use positional encodings for the input.
+There are two main models that can be trained with the script, with and without `--multihead`. More precisely, since `--multihead=True` by default here, we can pass `--multihead=False` when running the script to disable `--multihead`.
 
-More on positional encodings in the Details section.
+More on multihead-attention in the Details section.
 
-### Without `--pos_enc`
+### With `--multihead=False`
 
-Without positional encodings, the model has no way to differentiate whether an input step is a signal or a regular step. As a result, the model simply does not learn well without positional encodings.
+Without multihead-attention, the model here is the same as the model used in Task 3. 
 
-Sample of losses when training without `--pos_enc`:
-
-```
-Iteration 500 - Loss 1.3295859098434448
-Iteration 1000 - Loss 1.227324366569519
-Iteration 1500 - Loss 1.0068984031677246
-Iteration 2000 - Loss 0.9906516075134277
-```
-
-The losses generally stop decreasing after reaching about 1. The decrease in loss can be attributed to the model learning the range of possible output values and possibly choosing to focus on counting a fixed letter, which makes its predictions more reliable than random. However, it clearly does not learn well.
-
-### With `--pos_enc`
-
-With positional encodings, the model is able to encode the positions of the input sequence into the input embeddings, which allows the model to recognize which is the first step in the sequence.
-
-Sample of losses when training with `--pos_enc`:
+Sample of losses when training with `--multihead=False`:
 
 ```
-Iteration 500 - Loss 1.3017479181289673
-Iteration 1000 - Loss 0.115713931620121
-Iteration 1500 - Loss 0.05086364597082138
-Iteration 2000 - Loss 0.014654741622507572
+Iteration 1000 - Loss 1.430114507675171
+Iteration 2000 - Loss 1.1829146146774292
+Iteration 3000 - Loss 1.075669288635254
+Iteration 4000 - Loss 0.8190537095069885
 ```
 
-With positional encodings, the model learns way better. By checking the attention weights in the Encoder-Decoder Attention layer, we can also see that the decoder pays extra attention to the first step of the sequence, which gives the signal.
+The model seems to have insufficient capacity to learn well.
 
-Sample output from testing the model trained with `--pos_enc`:
+### With `--multihead=True`
+
+With multihead-attention, despite using the same number of attention layers, the model has a much larger capacity and learns much faster.
+
+Sample of losses when training with `--multihead=True`:
 
 ```
-Input: 
+Iteration 1000 - Loss 0.6175369024276733
+Iteration 2000 - Loss 0.04598541930317879
+Iteration 3000 - Loss 0.026927191764116287
+Iteration 4000 - Loss 0.0017624727915972471
+```
+
+Sample output from testing the model trained with `--multihead=True`:
+
+```
+Input:
 [[['B']
   ['C']
-  ['A']
   ['C']
-  ['A']
-  ['B']
-  ['B']
-  ['A']
-  ['A']
   ['C']
-  ['B']]]
-
-Prediction: 
-[[3]]
-
-Encoder-Decoder Attention: 
-Output step 0 attended mainly to Input steps: [0]
-[0.41, 0.046, 0.063, 0.045, 0.063, 0.068, 0.067, 0.063, 0.063, 0.045, 0.067]
-
-L2-Norm of Input Positional Encoding:
-[0.816, 0.181, 0.183, 0.185, 0.186, 0.18, 0.185, 0.183, 0.185, 0.183, 0.178]
-```
-
-In the above output, despite Input Steps 0, 5, 6, 10 all being 'B's, the decoder pays extra attention (41%) to Input Step 0.
-
-We can also check the L2-Norm for each vector in the positional encoding, where each vector represents the positional encoding for each step in the input sequence.
-
-Here the L2-Norm of the positional vector is far larger for the first step (0.816) than for the rest of the input sequence (~0.18). This makes perfect sense, since the first step has to be modified to encode its status as the signal. On the other hand, the model should leave the rest of the sequence untouched since a 'B' in the second step should be no different from a 'B' in the last step. As such, the positional vectors for the other steps have a much smaller L2-norm and modifies the steps less. More on this in the Details.
-
-*This experiment started out as an attempt to see if we can explicitly change the attention weights assigned to different letters by changing the signal ie. if the signal is 'B', the attention assigned to 'B's should be higher. However, this only seems to occur infrequently. Perhaps via self-attention, the sequence encodes the relevant information into the first step (signal) so the decoder simply focuses on the first step. Or it could be just spread out across all the steps so the decoder does not explicitly focus on the relevant letters in the input sequence. Maybe more on this in the future.*
-
-### Adjusting `--enc_layers`
-
-Using the script, we can also adjust the number of encoder layers, where each layer comprises self-attention, followed by a regular feed-forward network (see Figure 1 and Section 3.1 in Vaswani et. al (2017)).
-
-The number of encoder layers allow each step in the sequence to incorporate and encode information from other steps. Figure 4 in Vaswani et. al (2017) shows a good example with the following sentence:
-
-```
-The Law will never be perfect, but its application should be just - this is what we are missing, in my opinion.
-```
-
-By inspecting the self-attention weights for the word `its`, Vaswani et. al (2017) found heavier attentions for the words `Law` and `application`, which are very contextually relevant.
-
-In our case, the use of encoder layers allow the input sequence to modify itself based on its own signal. In particular, the decoder is restricted to a single scaled dot-product attention layer, which means that the encoder has to find a good representation for the sequence, so that the decoder can quickly retrieve the relevant information via a single attention layer.
-
-In general, we find that with increasing `--enc_layers`, the decoder's attention on the first step (signal) tends to decrease, in the Encoder-Decoder Attention layer.
-
-The previous sample output was trained with `--enc_layers=1`, where the attention weight on the signal was 32%.
-
-Sample output from testing the model trained with `--pos_enc` and `--enc_layers=6`:
-
-```
-Input: 
-[[['C']
   ['B']
-  ['B']
+  ['A']
+  ['A']
   ['B']
   ['A']
   ['C']
   ['C']
-  ['C']
-  ['B']
   ['C']
   ['A']]]
 
-Prediction: 
-[[4]]
+Prediction:
+[[2 4 4]]
 
-Encoder-Decoder Attention: 
-Output step 0 attended mainly to Input steps: [7]
-[0.08, 0.076, 0.076, 0.076, 0.092, 0.108, 0.108, 0.108, 0.076, 0.108, 0.092]
+Encoder-Decoder Attention:
+Attention of Output step 0 on Input steps
+    Head #0
+    [0.09, 0.091, 0.076, 0.065, 0.065, 0.088, 0.089, 0.065, 0.088, 0.065, 0.064, 0.064, 0.088]
+    Head #1
+    [0.459, 0.088, 0.095, 0.034, 0.052, 0.032, 0.029, 0.051, 0.03, 0.033, 0.033, 0.034, 0.03]
+    Head #2
+    [0.128, 0.003, 0.044, 0.003, 0.244, 0.084, 0.077, 0.239, 0.084, 0.003, 0.003, 0.003, 0.084]
+    Head #3
+    [0.023, 0.002, 0.062, 0.064, 0.029, 0.156, 0.149, 0.029, 0.15, 0.062, 0.062, 0.065, 0.149]
+Attention of Output step 1 on Input steps
+    Head #0
+    [0.097, 0.189, 0.018, 0.076, 0.085, 0.057, 0.057, 0.085, 0.057, 0.074, 0.075, 0.074, 0.056]
+    Head #1
+    [0.023, 0.757, 0.001, 0.039, 0.016, 0.009, 0.01, 0.016, 0.01, 0.037, 0.038, 0.036, 0.009]
+    Head #2
+    [0.107, 0.037, 0.078, 0.035, 0.13, 0.095, 0.093, 0.129, 0.095, 0.035, 0.035, 0.035, 0.095]
+    Head #3
+    [0.055, 0.024, 0.076, 0.077, 0.06, 0.106, 0.104, 0.059, 0.105, 0.077, 0.076, 0.078, 0.104]
+Attention of Output step 2 on Input steps
+    Head #0
+    [0.006, 0.001, 0.695, 0.009, 0.004, 0.063, 0.063, 0.004, 0.061, 0.01, 0.009, 0.009, 0.066]
+    Head #1
+    [0.023, 0.0, 0.782, 0.006, 0.018, 0.035, 0.031, 0.018, 0.033, 0.007, 0.006, 0.007, 0.034]
+    Head #2
+    [0.117, 0.0, 0.023, 0.0, 0.316, 0.061, 0.053, 0.305, 0.061, 0.0, 0.0, 0.0, 0.061]
+    Head #3
+    [0.008, 0.0, 0.042, 0.044, 0.012, 0.198, 0.184, 0.011, 0.187, 0.042, 0.042, 0.046, 0.184]
 
 L2-Norm of Input Positional Encoding:
-[0.884, 0.115, 0.119, 0.114, 0.116, 0.12, 0.116, 0.122, 0.118, 0.119, 0.12]
+[1.47, 1.564, 1.911, 0.295, 0.287, 0.292, 0.299, 0.286, 0.291, 0.293, 0.289, 0.291, 0.29]
 ```
 
-In contrast to the previous output from `--enc_layers=1`, the attention weight on the signal here is far smaller at only 8%.
+The output shows three sets of attention, one for each step of the output sequence. For each step, there are also four subsets of attention, each corresponding to a head. Each head shares the same weights, so we can look across the output steps to see what each head tries to focus on.
 
-Very hypothetically, it could be that the use of more encoder layers allows the encoding to spread out the information across all the steps, making the decoder less reliant on a single step.
+For example, Head #1 seems to be focusing on the relevant input signal for each output step (query), since the Head #1 attention is 45.9% for Output Step 0 on Input Step 0 (Signal 1), 75.7% for Output Step 1 on Input Step 1 (Signal 2) and 78.2% for Output Step 2 on Input Step 2 (Signal 3).
+
+Also, Head #3 seems to be primarily fixated on the 'A's in the sequence, irregardless of which output step serves as the query.
+
+Of course, these trends will differ from training run to training run and are actually rather inconsistent between training runs.
+
+Again, we can check the L2-Norm for each vector in the positional encoding and as per the trend in Task 3, we also see here that the L2-Norms of the positional vectors for the signals are far larger than for the rest of the sequence.
 
 ## Commands
 
-### Training Without `--pos_enc`
+### Training With `--multihead`
 
 ```
 $ python3 main.py --train
 ```
 
-This trains a model without positional encodings and with default parameters:
+This trains a model with multihead-attention (enabled by default) and with default parameters:
 
 - Training steps: `--steps=2000`
 - Batchsize: `--batchsize=100`
@@ -167,41 +139,49 @@ This trains a model without positional encodings and with default parameters:
 - Savepath: `--savepath=models/`
 - Encoding dimensions: `--hidden=64`
 - Encoder layers: `--enc_layers=1`
+- Number of heads: `--heads=4`
+- Positional Encoding: `--pos_enc=True`
 
 The model will be trained on the Difference Task with default parameters:
 
 - Max sequence length: `--max_len=10`
 - Vocabulary size: `--vocab_size=3`
 
-*Without `--pos_enc`, the model's loss typically does not fall below 0.9. Positional encodings are important for this task.*
-
-### Training With `--pos_enc`
+### Training With `--multihead=False`
 
 ```
-$ python3 main.py --train --pos_enc
+$ python3 main.py --train --multihead=False
 ```
 
-This trains a model with positional encodings and with default parameters (see above).
+This trains a model without multihead-attention and with default parameters (see above).
 
 The model will be trained on the Difference Task with default parameters (see above).
 
-Vary the number of encoder layers used with the `--enc_layers` flag:
+Vary the number of encoder layers used with the `--enc_layers` flag eg.
 
 ```
-$ python3 main.py --train --pos_enc --enc_layers 6
+$ python3 main.py --train --enc_layers 6
 ```
 
 The above command will train a model with positional encodings and 6 encoder layers. `--enc_layers=1` by default.
+
+Vary the number of heads in multihead-attention with the `--heads` flag eg.
+
+```
+$ python3 main.py --train --heads 8
+```
+
+The above command will train a model with multihead-attention using 8 heads. `--heads=4` by default and number of heads will be the same for all attention layers (ie. encoder self-attention and encoder-decoder attention).
 
 ### Testing
 
 ```
 $ python3 main.py --test
 or
-$ python3 main.py --test --pos_enc
+$ python3 main.py --test --multihead=False
 ```
 
-This tests the trained model (remember to specify the `--pos_enc` flag if positional encodings were used during training and to specify the number of encoder layers via `--enc_layers` if not default).
+This tests the trained model (remember to specify `--multihead=False` if multihead-attention was not used during training).
 
 ### Help
 
@@ -219,73 +199,33 @@ Skip ahead to the **Model** section for details about self-attention.
 
 This is similar to the inputs for Task 1, with two exceptions:
 
-- An additional first step that serves as the signal, which makes the second dimension `max_len + 1`
+- Additional first three step that serve as the signals, which makes the second dimension `max_len + 3`
 - No null character so the last dimension is simply `vocab_size`
 
-The input tensor has shape `(batchsize, max_len + 1, vocab_size)`.
+The input tensor has shape `(batchsize, max_len + 3, vocab_size)`.
 
 ### Output
 
-The output just consists of sequences of length 1, representing the count of the signal-specified letter, which ranges from 0 to `max_len`.
+The output just consists of sequences of length 3, representing the count of each signal-specified letter, which ranges from 0 to `max_len`.
 
-The output tensor is of shape `(batchsize, 1, max_len + 1)`.
+The output tensor is of shape `(batchsize, 3, max_len + 1)`.
 
 ### Model
 
-**Positional Encoding**
+**Multihead-Attention**
 
-We touched on this briefly at the end of Task 1 in the Notes section, where we discussed how the **Queries** tensor is also a form of positional encoding for the output.
+In regular attention, we simply compare alignment of the **Queries** with the **Keys** to get a softmax-ed set of weights, which we use to calculate a weighted sum of the **Values**.
 
-First, consider the embedding of the input:
+In multihead-attention, we first multiply the **Queries**, **Keys** and **Values** by respective weight tensors. Suppose the original tensors are all of shape `batchsize, length, hidden` and all consist of vectors of `hidden=64` dimensions and we want to implement multihead-attention with 4 heads. We then construct `4*3=12` weight tensors ie. 4 each for **Queries**, **Keys** and **Values**. Each weight tensor will be of shape `(hidden, hidden / 4)`, which means the outputs will consist of `64/4=16`-dimensional vectors. 
 
-```python3
-encoding = tf.layers.dense(
-	inputs=self.input,
-	units=self.hidden,
-	activation=None,
-	name="encoding"
-)
-```
+After multiplying the **Queries**, **Keys** and **Values** by their respective weight tensors (4 each), we will have 4 sets of **Queries**, **Keys** and **Values** tensors. The new tensors each consist of 16-dimensional vectors, as compared to the 64-dimensional vectors in the original tensors. 
 
-Since this is a simple position-wise feedforward network, an input vector of 'A' will always output the same encoding vector of `hidden` dimension, irregardless of the vector's position. (We use 'A' here as an example but the same logic applies to every other character.)
+We then proceed to do regular scaled dot-product attention with each of the 4 sets of **Queries**, **Keys** and **Values** tensors. We will then end up with 4 outputs, each of shape `(batchsize, length, 16)`. We concatenate these outputs along the last dimension, which gives us a large tensor of shape `(batchsize, length, 16*4=64)`. Notice that we get back `hidden` as the last dimension ie. the shape is also `(batchsize, length, hidden)`.
 
-Likewise, if we pass this straight to the Encoder-Decoder Attention layer, the same attention weights will be assigned to every vector that represents 'A'. In that sense, the decoder has no way of differentiating a signal 'A' from a regular 'A'.
+We then construct a output weight tensor of shape `(hidden, hidden)` and multiply the concatenated output with this weight tensor to obtain our final multihead output of shape `(batchsize, length, hidden)`.
 
-Will self-attention help?
+Notes:
 
-Nope. Just as in the Encoder-Decoder Attention layer, the same attention weights will be assigned to every vector that represents 'A', no matter how many times you apply self-attention to the encodings.
-
-Instead, we simply add positional encoding.
-
-```python3
-input_positional_encoding = tf.Variable(
-	initial_value=np.zeros((1, self.max_len + 1, self.hidden)),
-	trainable=True,
-	dtype=tf.float32,
-	name="input_positional_coding"
-)
-
-if self.pos_enc:
-	# Add positional encodings
-	encoding += input_positional_encoding
-```
-
-Here, we allow the model to learn the positional encoding by initializing it as a trainable `tf.Variable`, just as with the **Queries** tensor from Task 1. Then, we just add it to the encodings.
-
-Notice that the shape of the positional encoding is `(1, max_len + 1, hidden)` ie. for each step in a length `max_len + 1` sequence, there is a vector of `hidden` dimension that represents information about the position. When we add this to the encoding, the addition is broadcasted to each sequence in the batch.
-
-With this, an 'A' in one input step is different from an 'A' in another input step, since the positional vector at each input step is different. Furthermore, in this task, we know that the first step is significantly different as the signal, whereas the positions of the other steps are not very important. In fact, it is best if the positional encoding only changes the first step and leaves the rest of the sequence untouched, since position does not matter for the rest of the sequence. We see this clearly in the L2-norms of the positional vectors in the sample outputs from earlier (reproduced below), which are larger for the first step and much smaller for the rest of the steps.
-
-From model trained with `--pos_enc` and `enc_layers=1`:
-
-```
-L2-Norm of Input Positional Encoding:
-[0.816, 0.181, 0.183, 0.185, 0.186, 0.18, 0.185, 0.183, 0.185, 0.183, 0.178]
-```
-
-From model trained with `--pos_enc` and `enc_layers=6`:
-
-```
-L2-Norm of Input Positional Encoding:
-[0.884, 0.115, 0.119, 0.114, 0.116, 0.12, 0.116, 0.122, 0.118, 0.119, 0.12]
-```
+- h can actually be nonfactor of hidden eg. 5 but we need to adjust the output weight tensor
+- The weight tensors are similar to feedforward networks but without the bias and activation
+- We get to do h variations of attentions 

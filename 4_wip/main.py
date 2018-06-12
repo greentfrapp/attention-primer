@@ -16,16 +16,16 @@ flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
 
 # Training parameters
-flags.DEFINE_integer("steps", 2000, "Number of training steps")
+flags.DEFINE_integer("steps", 4000, "Number of training steps")
 flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
 flags.DEFINE_integer("save_every", 50, "Interval between saving model")
 flags.DEFINE_string("savepath", "models/", "Path to save or load model")
 flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
 
 # Model parameters
-flags.DEFINE_bool("multihead", True, "Whether to use multihead or vanilla attention")
+flags.DEFINE_bool("multihead", True, "Whether to use multihead or singlehead attention")
 flags.DEFINE_integer("heads", 4, "Number of heads for multihead attention")
-flags.DEFINE_bool("pos_enc", False, "Whether to use positional encodings")
+flags.DEFINE_bool("pos_enc", True, "Whether to use positional encodings")
 flags.DEFINE_integer("enc_layers", 1, "Number of self-attention layers for encodings")
 flags.DEFINE_integer("hidden", 64, "Hidden dimension in model")
 
