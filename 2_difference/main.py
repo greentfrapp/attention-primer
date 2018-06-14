@@ -101,7 +101,7 @@ class AttentionModel(object):
 		)
 
 		decoding, self.enc_attention_weights = self.attention(
-			query=tf.tile(decoder_input, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
+			query=tf.tile(query, multiples=tf.concat(([tf.shape(self.input)[0]], [1], [1]), axis=0)),
 			key=key_val,
 			value=key_val,
 		)
