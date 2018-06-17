@@ -13,6 +13,7 @@ This is still work-in-progress and feedback is appreciated!
 1. [Counting Letters](https://github.com/greentfrapp/attention-primer/tree/master/1_counting-letters) - Simple implementation of attention and tutorial on queries, keys and values
 2. [Difference](https://github.com/greentfrapp/attention-primer/tree/master/2_difference) - Demonstration of self-attention and using it for modeling intra-sequence dependencies
 3. [Signal](https://github.com/greentfrapp/attention-primer/tree/master/3_signal) - Demonstration of positional encodings
+4. [Signal 2](https://github.com/greentfrapp/attention-primer/tree/master/4_signal2) - Demonstration of multihead-attention
 
 More details below.
 
