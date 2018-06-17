@@ -16,7 +16,7 @@ flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
 
 # Training parameters
-flags.DEFINE_integer("steps", 4000, "Number of training steps")
+flags.DEFINE_integer("steps", 2000, "Number of training steps")
 flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
 flags.DEFINE_integer("save_every", 50, "Interval between saving model")
 flags.DEFINE_string("savepath", "models/", "Path to save or load model")
@@ -191,33 +191,34 @@ class AttentionModel(object):
 
 	def multihead_attention(self, query, key, value, h=4):
 		W_query = tf.Variable(
-			initial_value=tf.random_normal((1, h, self.hidden, int(self.hidden / h)), stddev=1e-2),
+			initial_value=tf.random_normal((self.hidden, self.hidden), stddev=1e-2),
 			trainable=True,
 			dtype=tf.float32,
 		)
 		W_key = tf.Variable(
-			initial_value=tf.random_normal((1, h, self.hidden, int(self.hidden / h)), stddev=1e-2),
+			initial_value=tf.random_normal((self.hidden, self.hidden), stddev=1e-2),
 			trainable=True,
 			dtype=tf.float32,
 		)
 		W_value = tf.Variable(
-			initial_value=tf.random_normal((1, h, self.hidden, int(self.hidden / h)), stddev=1e-2),
+			initial_value=tf.random_normal((self.hidden, self.hidden), stddev=1e-2),
 			trainable=True,
 			dtype=tf.float32,
 		)
-		multi_query = tf.matmul(tf.tile(tf.expand_dims(query, axis=1), multiples=[1, h, 1, 1]), tf.tile(W_query, multiples=tf.concat(([tf.shape(query)[0]], [1], [1], [1]), axis=0)))
-		multi_key = tf.matmul(tf.tile(tf.expand_dims(key, axis=1), multiples=[1, h, 1, 1]), tf.tile(W_key, multiples=tf.concat(([tf.shape(key)[0]], [1], [1], [1]), axis=0)))
-		multi_value = tf.matmul(tf.tile(tf.expand_dims(value, axis=1), multiples=[1, h, 1, 1]), tf.tile(W_value, multiples=tf.concat(([tf.shape(value)[0]], [1], [1], [1]), axis=0)))
-		output = tf.matmul(multi_query, multi_key, transpose_b=True) / (tf.cast(tf.shape(multi_query)[-1], tf.float32) ** 0.5)
-		attention_weights = tf.nn.softmax(output)
+		W_output = tf.Variable(
+			initial_value=tf.random_normal((self.hidden, self.hidden), stddev=1e-2),
+			trainable=True,
+			dtype=tf.float32,
+		)
+		multi_query = tf.reshape(tf.matmul(tf.reshape(query, [-1, self.hidden]), W_query), [-1, h, tf.shape(query)[1], int(self.hidden/h)])
+		multi_key = tf.reshape(tf.matmul(tf.reshape(key, [-1, self.hidden]), W_key), [-1, h, tf.shape(key)[1], int(self.hidden/h)])
+		multi_value = tf.reshape(tf.matmul(tf.reshape(value, [-1, self.hidden]), W_value), [-1, h, tf.shape(value)[1], int(self.hidden/h)])
+		dotp = tf.matmul(multi_query, multi_key, transpose_b=True) / (tf.cast(tf.shape(multi_query)[-1], tf.float32) ** 0.5)
+		attention_weights = tf.nn.softmax(dotp)
 		weighted_sum = tf.matmul(attention_weights, multi_value)
 		weighted_sum = tf.concat(tf.unstack(weighted_sum, axis=1), axis=-1)
-		W_multihead = tf.Variable(
-			initial_value=tf.random_normal((1, self.hidden, self.hidden), stddev=1e-2),
-			trainable=True,
-			dtype=tf.float32,
-		)
-		multihead = tf.matmul(weighted_sum, tf.tile(W_multihead, multiples=tf.concat(([tf.shape(weighted_sum)[0]], [1], [1]), axis=0)))
+		
+		multihead = tf.reshape(tf.matmul(tf.reshape(weighted_sum, [-1, self.hidden]), W_output), [-1, tf.shape(query)[1], self.hidden])
 		output = multihead + query
 		output = tf.contrib.layers.layer_norm(output, begin_norm_axis=2)
 		return output, attention_weights
