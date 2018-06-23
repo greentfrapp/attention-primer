@@ -210,9 +210,9 @@ class AttentionModel(object):
 			trainable=True,
 			dtype=tf.float32,
 		)
-		multi_query = tf.reshape(tf.matmul(tf.reshape(query, [-1, self.hidden]), W_query), [-1, h, tf.shape(query)[1], int(self.hidden/h)])
-		multi_key = tf.reshape(tf.matmul(tf.reshape(key, [-1, self.hidden]), W_key), [-1, h, tf.shape(key)[1], int(self.hidden/h)])
-		multi_value = tf.reshape(tf.matmul(tf.reshape(value, [-1, self.hidden]), W_value), [-1, h, tf.shape(value)[1], int(self.hidden/h)])
+		multi_query = tf.concat(tf.unstack(tf.reshape(tf.matmul(tf.reshape(query, [-1, self.hidden]), W_query), [-1, 1, tf.shape(query)[1], h, int(self.hidden/h)]), axis=3), axis= 1)
+		multi_key = tf.concat(tf.unstack(tf.reshape(tf.matmul(tf.reshape(key, [-1, self.hidden]), W_key), [-1, 1, tf.shape(key)[1], h, int(self.hidden/h)]), axis=3), axis= 1)
+		multi_value = tf.concat(tf.unstack(tf.reshape(tf.matmul(tf.reshape(value, [-1, self.hidden]), W_value), [-1, 1, tf.shape(value)[1], h, int(self.hidden/h)]), axis=3), axis= 1)
 		dotp = tf.matmul(multi_query, multi_key, transpose_b=True) / (tf.cast(tf.shape(multi_query)[-1], tf.float32) ** 0.5)
 		attention_weights = tf.nn.softmax(dotp)
 		weighted_sum = tf.matmul(attention_weights, multi_value)
