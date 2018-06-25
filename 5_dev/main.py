@@ -18,6 +18,7 @@ FLAGS = flags.FLAGS
 # Commands
 flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
+flags.DEFINE_bool("load", False, "Resume training from saved model")
 
 # Training parameters
 flags.DEFINE_integer("steps", 2000, "Number of training steps")
@@ -308,6 +309,7 @@ class AttentionModel(object):
 		self.saver.restore(self.sess, ckpt)
 		if verbose:
 			print("Model loaded from {}.".format(ckpt))
+		return ckpt
 
 def main(unused_args):
 
@@ -316,7 +318,12 @@ def main(unused_args):
 		with tf.Session() as sess:
 			task = Task()
 			model = AttentionModel(sess=sess, en_vocab_size=task.en_vocab_size, de_vocab_size=task.de_vocab_size, max_len=FLAGS.max_len, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers, use_multihead=FLAGS.multihead, heads=FLAGS.heads)
-			sess.run(tf.global_variables_initializer())
+			if FLAGS.load:
+				ckpt = model.load(FLAGS.savepath)
+				step = int(ckpt.split("ckpt-")[-1]) + 1
+			else:
+				sess.run(tf.global_variables_initializer())
+				step = 1
 			for i in np.arange(FLAGS.steps):
 				minibatch_enc_in, minibatch_dec_in, minibatch_dec_out = task.next_batch(batchsize=FLAGS.batchsize)
 				feed_dict = {
@@ -325,13 +332,13 @@ def main(unused_args):
 					model.labels: minibatch_dec_out,
 				}
 				_, loss = sess.run([model.optimize, model.loss], feed_dict)
-				if (i + 1) % FLAGS.save_every == 0:
-					model.save(FLAGS.savepath, global_step=i + 1)
-				if (i + 1) % FLAGS.print_every == 0:
-					print("Iteration {} - Loss {}".format(i + 1, loss))
-			print("Iteration {} - Loss {}".format(i + 1, loss))
+				if (i + step) % FLAGS.save_every == 0:
+					model.save(FLAGS.savepath, global_step=i + step)
+				if (i + step) % FLAGS.print_every == 0:
+					print("Iteration {} - Loss {}".format(i + step, loss))
+			print("Iteration {} - Loss {}".format(i + step, loss))
 			print("Training complete!")
-			model.save(FLAGS.savepath, global_step=i + 1, verbose=True)
+			model.save(FLAGS.savepath, global_step=i + step, verbose=True)
 
 	if FLAGS.test:
 		with tf.Session() as sess:
