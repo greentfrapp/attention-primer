@@ -23,28 +23,34 @@ Here is a sample output from the script.
 Input: 
 [[['A']
   ['A']
-  ['C']
-  ['C']
+  ['A']
   ['B']
+  ['C']
   [' ']
-  ['C']
-  ['C']
-  ['C']
-  ['B']]]
+  ['A']
+  ['B']
+  ['B']
+  ['A']]]
 
 Prediction: 
-[[2 2 5]]
+[[5 3 1]]
 
 Encoder-Decoder Attention: 
-Output step 0 attended mainly to Input steps: [0 1]
-[0.232, 0.232, 0.061, 0.061, 0.064, 0.101, 0.061, 0.061, 0.061, 0.064]
-Output step 1 attended mainly to Input steps: [4 9]
-[0.066, 0.066, 0.06, 0.06, 0.232, 0.101, 0.06, 0.06, 0.06, 0.232]
-Output step 2 attended mainly to Input steps: [2 3 6 7 8]
-[0.044, 0.044, 0.152, 0.152, 0.043, 0.066, 0.152, 0.152, 0.152, 0.043]
+Output step 0 attended mainly to Input steps: [0 1 2 6 9]
+[0.154, 0.154, 0.154, 0.042, 0.04, 0.065, 0.154, 0.042, 0.042, 0.154]
+Output step 1 attended mainly to Input steps: [3 7 8]
+[0.053, 0.053, 0.053, 0.2, 0.05, 0.083, 0.053, 0.2, 0.2, 0.053]
+Output step 2 attended mainly to Input steps: [4]
+[0.072, 0.072, 0.072, 0.078, 0.286, 0.12, 0.072, 0.078, 0.078, 0.072]
 ```
 
-For each output step, we see the learned attention being intuitively weighted on the relevant letters. In the above example, Output Step 0 counts the number of 'A's and attended mainly to Input Steps 0 and 1, which were the 'A's in the sequence.
+For each output step, we see the learned attention being intuitively weighted on the relevant letters. In the above example, Output Step 0 counts the number of 'A's and attended mainly to Input Steps 0, 1, 2, 6 and 9, which were the 'A's in the sequence.
+
+With the `--plot` flag we can also visualize the attention heatmap, which clearly shows the attention focused on the relevant characters for each output.
+
+<div>
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/1_counting-letters/images/attention.png" alt="attention heatmap" width="400px" height="whatever" style="display: block;">
+</div>
 
 Just as with a recurrent network, the trained model is able to take in variable sequence lengths, although performance definitely worsens when we deviate from the lengths used in the training set.
 
@@ -77,9 +83,10 @@ $ python3 main.py --test
 
 This tests the trained model (remember to specify the parameters if the trained model did not use default parameters).
 
-In particular, you can modify the test sample's length:
+In particular, you can modify the test sample's length and also whether to plot the attention heatmap (defaults to False):
 
 - Sample length: `--sample_len=10`
+- Plot: `--plot`
 
 A model trained with the default parameters works reasonably well with sample lengths of 9 to 11. Shorter or longer sequences will see significant degradation of performance. 
 

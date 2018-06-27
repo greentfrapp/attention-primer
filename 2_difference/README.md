@@ -39,34 +39,40 @@ Here is a sample output from the script without `--self_att` ie. similar to Task
 
 ```
 Input: 
-[[[' ']
-  [' ']
+[[['A']
   [' ']
   ['A']
+  ['A']
   ['B']
-  [' ']
-  ['C']
   ['C']
   [' ']
-  ['A']]]
+  ['C']
+  ['B']
+  [' ']]]
 
 Prediction: 
-[[2 1 2 1]]
+[[3 2 2 1]]
 
 Encoder-Decoder Attention: 
-Output step 0 attended mainly to Input steps: [3 9]
-[0.092, 0.092, 0.092, 0.186, 0.03, 0.092, 0.068, 0.068, 0.092, 0.186]
-Output step 1 attended mainly to Input steps: [4]
-[0.107, 0.107, 0.107, 0.036, 0.238, 0.107, 0.077, 0.077, 0.107, 0.036]
-Output step 2 attended mainly to Input steps: [6 7]
-[0.071, 0.071, 0.071, 0.05, 0.043, 0.071, 0.25, 0.25, 0.071, 0.05]
-Output step 3 attended mainly to Input steps: [4]
-[0.092, 0.092, 0.092, 0.135, 0.139, 0.092, 0.065, 0.065, 0.092, 0.135]
+Output step 0 attended mainly to Input steps: [0 2 3]
+[0.186, 0.085, 0.186, 0.186, 0.031, 0.062, 0.085, 0.062, 0.031, 0.085]
+Output step 1 attended mainly to Input steps: [4 8]
+[0.037, 0.105, 0.037, 0.037, 0.204, 0.083, 0.105, 0.083, 0.204, 0.105]
+Output step 2 attended mainly to Input steps: [5 7]
+[0.049, 0.08, 0.049, 0.049, 0.051, 0.256, 0.08, 0.256, 0.051, 0.08]
+Output step 3 attended mainly to Input steps: [0 2 3]
+[0.134, 0.082, 0.134, 0.134, 0.123, 0.053, 0.082, 0.053, 0.123, 0.082]
 ```
 
-As per Task 1, we see the output steps attending to their respective letters in the input sequence eg. Output Step 0 attending to the positions of 'A's at Input Steps 3 and 9. 
+As per Task 1, we see the output steps attending to their respective letters in the input sequence eg. Output Step 0 attending to the positions of 'A's at Input Steps 0, 2 and 3. 
 
-More interestingly, we see that Output Step 3 actually attends to positions of both 'A' and 'B'. Looking at the attention of Output Step 3, the maximum attention weight of 0.139 is assigned to Input Step 4, which holds 'B'. But attention weights of 0.135 are also assigned to Input Steps 3 and 9, which hold 'A's.
+More interestingly, we see that Output Step 3 actually attends to positions of both 'A' and 'B'. Looking at the attention of Output Step 3, the maximum attention weight of 0.134 is assigned to Input Steps 0, 2 and 3, which hold the 'A's. But attention weights of 0.123 are also assigned to Input Steps 4 and 8, which hold 'B's.
+
+Just as in Task 1, we can also use the `--plot` flag to visualize the attention heatmap.
+
+<div>
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/2_difference/images/enc_attention_noself.png" alt="encoder attention heatmap no self" width="400px" height="whatever" style="display: block;">
+</div>
 
 In other words, Output Step 3 can be modeled as being dependent on Output Steps 1 and 2. But it can also be modeled as simply being dependent on the inputs of Output Steps 1 and 2. With this simple example, we can see that although there is superficial inter-token dependence in the output, this can be reframed as input dependence. 
 
@@ -82,44 +88,56 @@ With the `--self_att` flag enabled, the script prints  the self-attention weight
 Input: 
 [[['B']
   ['B']
-  ['C']
+  ['B']
+  ['A']
   [' ']
   ['A']
   ['C']
   ['A']
-  ['A']
-  ['C']
-  ['C']]]
+  ['B']
+  ['B']]]
 
 Prediction: 
-[[3 2 4 1]]
+[[3 5 1 2]]
 
 Encoder-Decoder Attention: 
-Output step 0 attended mainly to Input steps: [4 6 7]
-[0.05, 0.05, 0.061, 0.075, 0.193, 0.061, 0.193, 0.193, 0.061, 0.061]
-Output step 1 attended mainly to Input steps: [0 1]
-[0.219, 0.219, 0.073, 0.089, 0.06, 0.073, 0.06, 0.06, 0.073, 0.073]
-Output step 2 attended mainly to Input steps: [8 9]
-[0.041, 0.041, 0.174, 0.093, 0.042, 0.174, 0.042, 0.042, 0.174, 0.174]
-Output step 3 attended mainly to Input steps: [3]
-[0.088, 0.088, 0.109, 0.116, 0.091, 0.109, 0.091, 0.091, 0.109, 0.109]
+Output step 0 attended mainly to Input steps: [3 5 7]
+[0.053, 0.053, 0.053, 0.196, 0.08, 0.196, 0.065, 0.196, 0.053, 0.053]
+Output step 1 attended mainly to Input steps: [0 1 2 8 9]
+[0.152, 0.152, 0.152, 0.042, 0.061, 0.042, 0.05, 0.042, 0.152, 0.152]
+Output step 2 attended mainly to Input steps: [6]
+[0.068, 0.068, 0.068, 0.07, 0.157, 0.07, 0.292, 0.07, 0.068, 0.068]
+Output step 3 attended mainly to Input steps: [4]
+[0.097, 0.097, 0.097, 0.098, 0.114, 0.098, 0.105, 0.098, 0.097, 0.097]
 
 Self-Attention: 
 Attention of Output step 0:
 [1.0, 0.0, 0.0, 0.0]
 Attention of Output step 1:
-[0.0, 1.0, 0.0, 0.0]
+[0.0, 0.989, 0.0, 0.011]
 Attention of Output step 2:
-[0.009, 0.006, 0.965, 0.021]
+[0.001, 0.007, 0.99, 0.002]
 Attention of Output step 3:
-[0.696, 0.06, 0.038, 0.205]
+[0.003, 0.627, 0.002, 0.368]
 ```
 
 First, with `--self_att`, the Encoder-Decoder Attention weights for Output Step 3 is now much more evenly divided across all the input steps. Since we now allow the modelling of inter-token dependence in the output via self-attention, Output Step 3 can gather more information later from Output Steps 0 and 1.
 
+<div>
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/2_difference/images/enc_attention_self.png" alt="encoder attention heatmap no self" width="400px" height="whatever" style="display: block;">
+</div>
+
+*Attention heatmap of output steps on the input sequence.*
+
 In the Self-Attention weights, notice that Output Steps 0, 1 and 2 are generally narcissistic and pay nearly 100% attention to themselves. This is because they are largely independent, just like the output in Task 1.
 
-However, Output Step 3 pays far less attention to itself (20%) and instead pays a lot of attention on Output Step 0 (70%) and a tiny bit of attention to Output Step 1 (6%). Very intuitive, given that Output Step 3 is supposed to show the difference between Output Steps 0 and 1.
+However, Output Step 3 pays far less attention to itself (37%) and instead pays a lot of attention to Output Step 1 (63%). 
+
+<div>
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/2_difference/images/self_attention_self.png" alt="encoder attention heatmap no self" width="200px" height="whatever" style="display: block;">
+</div>
+
+*Self-attention heatmap of output steps.*
 
 By allowing the output sequence to self-attend, we enable the modelling of inter-token dependencies. 
 

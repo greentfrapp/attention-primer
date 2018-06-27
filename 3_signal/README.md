@@ -72,31 +72,43 @@ Sample output from testing the model trained with `--pos_enc`:
 ```
 Input: 
 [[['B']
-  ['C']
   ['A']
-  ['C']
   ['A']
   ['B']
   ['B']
-  ['A']
-  ['A']
   ['C']
-  ['B']]]
+  ['B']
+  ['B']
+  ['C']
+  ['B']
+  ['A']]]
 
 Prediction: 
-[[3]]
+[[5]]
 
 Encoder-Decoder Attention: 
 Output step 0 attended mainly to Input steps: [0]
-[0.41, 0.046, 0.063, 0.045, 0.063, 0.068, 0.067, 0.063, 0.063, 0.045, 0.067]
+[0.237, 0.086, 0.087, 0.058, 0.058, 0.106, 0.058, 0.058, 0.108, 0.058, 0.086]
 
 L2-Norm of Input Positional Encoding:
-[0.816, 0.181, 0.183, 0.185, 0.186, 0.18, 0.185, 0.183, 0.185, 0.183, 0.178]
+[0.827, 0.153, 0.151, 0.152, 0.156, 0.156, 0.157, 0.153, 0.155, 0.151, 0.155]
 ```
 
-In the above output, despite Input Steps 0, 5, 6, 10 all being 'B's, the decoder pays extra attention (41%) to Input Step 0.
+In the above output, despite Input Steps 0, 3, 4, 6, 7, 9 all being 'B's, the decoder pays extra attention (24%) to Input Step 0.
+
+<div>
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/3_signal/images/attention.png" alt="attention heatmap" width="400px" height="whatever" style="display: block;">
+</div>
+
+*Attention heatmap of output steps on input sequence.*
 
 We can also check the L2-Norm for each vector in the positional encoding, where each vector represents the positional encoding for each step in the input sequence.
+
+<div>
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/3_signal/images/positional_encodings.png" alt="positional_encodings" width="400px" height="whatever" style="display: block;">
+</div>
+
+*L2-norm of positional encodings for each input step.*
 
 Here the L2-Norm of the positional vector is far larger for the first step (0.816) than for the rest of the input sequence (~0.18). This makes perfect sense, since the first step has to be modified to encode its status as the signal. On the other hand, the model should leave the rest of the sequence untouched since a 'B' in the second step should be no different from a 'B' in the last step. As such, the positional vectors for the other steps have a much smaller L2-norm and modifies the steps less. More on this in the Details.
 
