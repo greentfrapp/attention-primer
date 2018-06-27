@@ -8,12 +8,15 @@ import numpy as np
 import string
 from absl import flags
 from absl import app
+import seaborn
+import matplotlib.pyplot as plt
 
 FLAGS = flags.FLAGS
 
 # Commands
 flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
+flags.DEFINE_bool("plot", False, "Plot attention heatmap during testing")
 
 # Training parameters
 flags.DEFINE_integer("steps", 2000, "Number of training steps")
@@ -180,6 +183,19 @@ def main(unused_args):
 			for i, output_step in enumerate(attention[0]):
 				print("Output step {} attended mainly to Input steps: {}".format(i, np.where(output_step >= np.max(output_step))[0]))
 				print([float("{:.3f}".format(step)) for step in output_step])
+
+			if FLAGS.plot:
+				fig, ax = plt.subplots()
+				seaborn.heatmap(
+					attention[0],
+					yticklabels=["output_0", "output_1", "output_2"],
+					xticklabels=task.prettify(samples).reshape(-1),
+					cbar=False,
+					ax=ax,
+				)
+				ax.set_aspect('equal')
+				for tick in ax.get_yticklabels(): tick.set_rotation(0)
+				plt.show()
 
 
 if __name__ == "__main__":
