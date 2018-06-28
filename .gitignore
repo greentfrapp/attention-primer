@@ -1,7 +1,8 @@
-*/de-en/
-*/models*/
+1_counting-letters/models/
+2_difference/models/
+3_signal/models/
+4_signal2/models/
 *.DS_Store
-5_dev/de-en/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
