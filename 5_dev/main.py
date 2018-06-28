@@ -1,6 +1,6 @@
 """
-Task 3 - Signal
-Demonstration of positional encodings
+Task 5 - Translation
+Demonstration of full Transformer model
 """
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
@@ -12,6 +12,9 @@ import regex
 import json
 from absl import flags
 from absl import app
+import seaborn
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
 
 FLAGS = flags.FLAGS
 
@@ -19,47 +22,46 @@ FLAGS = flags.FLAGS
 flags.DEFINE_bool("train", False, "Train")
 flags.DEFINE_bool("test", False, "Test")
 flags.DEFINE_bool("load", False, "Resume training from saved model")
+flags.DEFINE_bool("plot", False, "Plot attention heatmaps")
 
 # Training parameters
-flags.DEFINE_integer("steps", 2000, "Number of training steps")
+flags.DEFINE_integer("steps", 50000, "Number of training steps")
 flags.DEFINE_integer("print_every", 50, "Interval between printing loss")
 flags.DEFINE_integer("save_every", 50, "Interval between saving model")
-flags.DEFINE_string("savepath", "models_de2en/", "Path to save or load model")
-flags.DEFINE_integer("batchsize", 100, "Training batchsize per step")
+flags.DEFINE_string("savepath", "models/", "Path to save or load model")
+flags.DEFINE_integer("batchsize", 64, "Training batchsize per step")
+flags.DEFINE_float("lr", 1e-4, "Learning rate")
 
 # Model parameters
-flags.DEFINE_bool("multihead", True, "Whether to use multihead or singlehead attention")
 flags.DEFINE_integer("heads", 4, "Number of heads for multihead attention")
-flags.DEFINE_bool("pos_enc", True, "Whether to use positional encodings")
 flags.DEFINE_integer("enc_layers", 1, "Number of self-attention layers for encodings")
+flags.DEFINE_integer("dec_layers", 6, "Number of self-attention layers for encodings")
 flags.DEFINE_integer("hidden", 64, "Hidden dimension in model")
 
 # Task parameters
 flags.DEFINE_integer("max_len", 20, "Maximum input length from toy task")
-flags.DEFINE_integer("vocab_size", 3, "Size of input vocabulary")
-flags.DEFINE_string("signal", None, "Control signal character for test sample")
 flags.DEFINE_integer("line", None, "Line to test")
 
 
 class Task(object):
 	
 	def __init__(self):
-		self.en_file = "de-en/train.tags.de-en.en"
-		self.de_file = "de-en/train.tags.de-en.de"
+		self.en_file = "data/train.tags.de-en.en"
+		self.de_file = "data/train.tags.de-en.de"
 		self.en_samples = self.get_samples(self.en_file)
 		self.de_samples = self.get_samples(self.de_file)
 		self.rand_de = np.random.RandomState(1)
 		self.rand_en = np.random.RandomState(1)
 		self.n_samples = len(self.en_samples)
-		self.en_dict = json.load(open("en_dict.json", 'r', encoding='utf-8'))
-		self.de_dict = json.load(open("de_dict.json", 'r', encoding='utf-8'))
+		self.en_dict = json.load(open("data/en_dict.json", 'r', encoding='utf-8'))
+		self.de_dict = json.load(open("data/de_dict.json", 'r', encoding='utf-8'))
 		self.en_vocab_size = len(self.en_dict)
 		self.de_vocab_size = len(self.de_dict)
 		self.idx = 0
 
 	def get_samples(self, file):
 		text = codecs.open(file, 'r', 'utf-8').read().lower()
-		text = regex.sub("<.*>.*</.*>\n", "", text)
+		text = regex.sub("<.*>.*</.*>\r\n", "", text)
 		text = regex.sub("[^\n\s\p{Latin}']", "", text)
 		samples = text.split('\n')
 		return samples
@@ -84,7 +86,7 @@ class Task(object):
 		idxs = np.array(idxs)
 		return np.eye(len(dictionary))[idxs]
 
-	def next_batch(self, batchsize=64, idx=None):
+	def next_batch(self, batchsize=64, max_len=20, idx=None):
 		start = self.idx
 		if idx is not None:
 			start = idx
@@ -105,10 +107,10 @@ class Task(object):
 		en_minibatch_out = []
 		de_minibatch = []
 		for sample in en_minibatch_text:
-			en_minibatch_in.append(self.embed(sample, self.en_dict, sos=True))
-			en_minibatch_out.append(self.embed(sample, self.en_dict, eos=True))
+			en_minibatch_in.append(self.embed(sample, self.en_dict, max_len=max_len, sos=True))
+			en_minibatch_out.append(self.embed(sample, self.en_dict, max_len=max_len, eos=True))
 		for sample in de_minibatch_text:
-			de_minibatch.append(self.embed(sample, self.de_dict))
+			de_minibatch.append(self.embed(sample, self.de_dict, max_len=max_len))
 		return np.array(de_minibatch), np.array(en_minibatch_in), np.array(en_minibatch_out)
 
 	def prettify(self, sample, dictionary):
@@ -118,7 +120,7 @@ class Task(object):
 
 class AttentionModel(object):
 
-	def __init__(self, sess, en_vocab_size, de_vocab_size, max_len=20, hidden=512, name="Translate", pos_enc=True, enc_layers=6, dec_layers=6, use_multihead=True, heads=8):
+	def __init__(self, sess, en_vocab_size, de_vocab_size, max_len=20, hidden=64, name="Translate", enc_layers=6, dec_layers=6, heads=4, learning_rate=1e-4):
 		super(AttentionModel, self).__init__()
 		self.sess = sess
 		self.max_len = max_len
@@ -126,11 +128,10 @@ class AttentionModel(object):
 		self.de_vocab_size = de_vocab_size
 		self.hidden = hidden
 		self.name = name
-		self.pos_enc = pos_enc
 		self.enc_layers = enc_layers
 		self.dec_layers = dec_layers
-		self.use_multihead = use_multihead
 		self.heads = heads
+		self.learning_rate = learning_rate
 		with tf.variable_scope(self.name):
 			self.build_model()
 			variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.name)
@@ -222,7 +223,7 @@ class AttentionModel(object):
 				mask=True,
 			)
 			# Encoder-Decoder Attention
-			decoding, _ = self.multihead_attention(
+			decoding, self.attention = self.multihead_attention(
 				query=decoding,
 				key=encoding,
 				value=encoding,
@@ -253,7 +254,7 @@ class AttentionModel(object):
 		self.logits = decoding
 		self.predictions = tf.argmax(self.logits, axis=2)
 		self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.logits))
-		self.optimize = tf.train.AdamOptimizer(1e-4).minimize(self.loss)
+		self.optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
 
 	def multihead_attention(self, query, key, value, h=4, mask=False):
 		W_query = tf.Variable(
@@ -317,7 +318,17 @@ def main(unused_args):
 		tf.gfile.MakeDirs(FLAGS.savepath)
 		with tf.Session() as sess:
 			task = Task()
-			model = AttentionModel(sess=sess, en_vocab_size=task.en_vocab_size, de_vocab_size=task.de_vocab_size, max_len=FLAGS.max_len, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers, use_multihead=FLAGS.multihead, heads=FLAGS.heads)
+			model = AttentionModel(
+				sess=sess,
+				en_vocab_size=task.en_vocab_size,
+				de_vocab_size=task.de_vocab_size,
+				max_len=FLAGS.max_len,
+				hidden=FLAGS.hidden,
+				enc_layers=FLAGS.enc_layers,
+				dec_layers=FLAGS.dec_layers,
+				heads=FLAGS.heads,
+				learning_rate=FLAGS.lr,
+			)
 			if FLAGS.load:
 				ckpt = model.load(FLAGS.savepath)
 				step = int(ckpt.split("ckpt-")[-1]) + 1
@@ -325,7 +336,7 @@ def main(unused_args):
 				sess.run(tf.global_variables_initializer())
 				step = 1
 			for i in np.arange(FLAGS.steps):
-				minibatch_enc_in, minibatch_dec_in, minibatch_dec_out = task.next_batch(batchsize=FLAGS.batchsize)
+				minibatch_enc_in, minibatch_dec_in, minibatch_dec_out = task.next_batch(batchsize=FLAGS.batchsize, max_len=FLAGS.max_len)
 				feed_dict = {
 					model.enc_input: minibatch_enc_in,
 					model.dec_input: minibatch_dec_in,
@@ -343,10 +354,21 @@ def main(unused_args):
 	if FLAGS.test:
 		with tf.Session() as sess:
 			task = Task()
-			model = AttentionModel(sess=sess, en_vocab_size=task.en_vocab_size, de_vocab_size=task.de_vocab_size, max_len=FLAGS.max_len, hidden=FLAGS.hidden, pos_enc=FLAGS.pos_enc, enc_layers=FLAGS.enc_layers, use_multihead=FLAGS.multihead, heads=FLAGS.heads)
+			model = AttentionModel(
+				sess=sess,
+				en_vocab_size=task.en_vocab_size,
+				de_vocab_size=task.de_vocab_size,
+				max_len=FLAGS.max_len,
+				hidden=FLAGS.hidden,
+				enc_layers=FLAGS.enc_layers,
+				dec_layers=FLAGS.dec_layers,
+				heads=FLAGS.heads,
+				learning_rate=FLAGS.lr,
+			)
 			model.load(FLAGS.savepath)
-			samples, _, _ = task.next_batch(batchsize=1, idx=FLAGS.line)
-			print("\nInput: \n{}".format(task.prettify(samples[0], task.de_dict)))
+			samples, _, truth = task.next_batch(batchsize=1, max_len=FLAGS.max_len, idx=FLAGS.line)
+			print("\nInput : \n{}".format(task.prettify(samples[0], task.de_dict)))
+			print("\nTruth : \n{}".format(task.prettify(truth[0], task.en_dict)))
 
 			output = ""
 			for i in np.arange(FLAGS.max_len):
@@ -354,9 +376,31 @@ def main(unused_args):
 					model.enc_input: samples,
 					model.dec_input: [task.embed(output, task.en_dict, sos=True)],
 				}
-				predictions = sess.run(model.logits, feed_dict)
+				predictions, attention = sess.run([model.logits, model.attention], feed_dict)
 				output += " " + task.prettify(predictions[0], task.en_dict).split()[i]
-			print("\nOutput: \n{}".format(output))
+			print("\nOutput: \n{}".format(task.prettify(predictions[0], task.en_dict)))
+
+			if FLAGS.plot:
+				fig = plt.figure(figsize=(10, 10))
+				gs = gridspec.GridSpec(2, 2, hspace=0.5, wspace=0.5)
+				x_labels = regex.sub("\s<PAD>", "", task.prettify(samples[0], task.de_dict)).split()
+				y_labels = regex.sub("\s<PAD>", "", task.prettify(predictions[0], task.en_dict)).split()
+				for i in np.arange(4):
+					ax = plt.Subplot(fig, gs[i])
+					seaborn.heatmap(
+						data=attention[0][i, :len(y_labels), :len(x_labels)],
+						xticklabels=x_labels,
+						yticklabels=y_labels,
+						cbar=False,
+						ax=ax,
+					)
+					ax.set_title("Head {}".format(i))
+					ax.set_aspect('equal')
+					for tick in ax.get_xticklabels(): tick.set_rotation(90)
+					for tick in ax.get_yticklabels(): tick.set_rotation(0)
+					fig.add_subplot(ax)
+				plt.show()
+
 
 if __name__ == "__main__":
 	app.run(main)
