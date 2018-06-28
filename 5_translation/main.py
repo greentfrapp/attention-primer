@@ -367,8 +367,8 @@ def main(unused_args):
 			)
 			model.load(FLAGS.savepath)
 			samples, _, truth = task.next_batch(batchsize=1, max_len=FLAGS.max_len, idx=FLAGS.line)
-			print("\nInput : \n{}".format(task.prettify(samples[0], task.de_dict)))
-			print("\nTruth : \n{}".format(task.prettify(truth[0], task.en_dict)))
+			print("\nInput : \n{}".format(regex.sub("\s<PAD>", "", task.prettify(samples[0], task.de_dict))))
+			print("\nTruth : \n{}".format(regex.sub("\s<PAD>", "", task.prettify(truth[0], task.en_dict))))
 
 			output = ""
 			for i in np.arange(FLAGS.max_len):
@@ -378,7 +378,7 @@ def main(unused_args):
 				}
 				predictions, attention = sess.run([model.logits, model.attention], feed_dict)
 				output += " " + task.prettify(predictions[0], task.en_dict).split()[i]
-			print("\nOutput: \n{}".format(task.prettify(predictions[0], task.en_dict)))
+			print("\nOutput: \n{}".format(regex.sub("\s<PAD>", "", task.prettify(predictions[0], task.en_dict))))
 
 			if FLAGS.plot:
 				fig = plt.figure(figsize=(10, 10))

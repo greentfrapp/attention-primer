@@ -98,13 +98,13 @@ Some interesting results.
 
 ```
 Input :
-ich denke das problem ist dass wir das meer f체r zu selbstverst채ndlich halten <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+ich denke das problem ist dass wir das meer f체r zu selbstverst채ndlich halten
 
 Truth :
-and the problem i think is that we take the ocean for <UNK> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+and the problem i think is that we take the ocean for <UNK>
 
 Output:
-i think the problem is that we take the ocean for <UNK> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+i think the problem is that we take the ocean for <UNK>
 ```
 
 <div>
@@ -117,13 +117,13 @@ Both words in `the ocean` attends to `meer` for all four heads. In addition, `f�
 
 ```
 Input :
-die meisten tiere leben in den ozeanen <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+die meisten tiere leben in den ozeanen
 
 Truth :
-most of the animals are in the <UNK> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+most of the animals are in the <UNK>
 
 Output:
-most animals live in the <UNK> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+most animals live in the <UNK>
 ```
 
 <div>
@@ -136,13 +136,13 @@ In this case, we see that the token `most` attends to `meisten` and ignores the 
 
 ```
 Input :
-체brigens ist das zeug <UNK> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+체brigens ist das zeug <UNK>
 
 Truth :
-this stuff is <UNK> as <UNK> by the way <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+this stuff is <UNK> as <UNK> by the way
 
 Output:
-by the way that's <UNK> stuff <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+by the way that's <UNK> stuff
 ```
 
 <div>
