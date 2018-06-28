@@ -1,6 +1,7 @@
 */de-en/
 */models*/
 *.DS_Store
+5_dev/de-en/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
