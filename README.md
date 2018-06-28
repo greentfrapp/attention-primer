@@ -14,6 +14,7 @@ This is still work-in-progress and feedback is appreciated!
 2. [Difference](https://github.com/greentfrapp/attention-primer/tree/master/2_difference) - Demonstration of self-attention and using it for modeling intra-sequence dependencies
 3. [Signal](https://github.com/greentfrapp/attention-primer/tree/master/3_signal) - Demonstration of positional encodings
 4. [Signal 2](https://github.com/greentfrapp/attention-primer/tree/master/4_signal2) - Demonstration of multihead-attention
+5. [Translation](https://github.com/greentfrapp/attention-primer/tree/master/5_translation) - Demonstration of Transformer on translation
 
 More details below.
 
@@ -281,3 +282,32 @@ L2-Norm of Input Positional Encoding:
 The output shows three sets of attention, one for each step of the output sequence. For each step, there are also four subsets of attention, each corresponding to a head.
 
 Refer to the task's [README](https://github.com/greentfrapp/attention-primer/tree/master/4_signal2) for more details.
+
+### [4 - Signal 2](https://github.com/greentfrapp/attention-primer/tree/master/4_signal2)
+
+**In this task, we demonstrate the Transformer model on a translation task.**
+
+Here we implement the full Transformer model on the IWSLT 2016 de-en dataset, a much smaller than the WMT dataset used by Vawani et. al, but sufficient to demonstrate the model's capabilities.
+
+*The training data and pretrained model is available here for testing.*
+
+**Sample translation with `--line=153`**
+
+```
+Input :
+übrigens ist das zeug <UNK> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+
+Truth :
+this stuff is <UNK> as <UNK> by the way <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+
+Output:
+by the way that's <UNK> stuff <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+```
+
+<div>
+<img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/5_translation/images/line_153.png" alt="task_1" width="800px" height="whatever" style="display: block;">
+</div>
+
+Here the tokens `by the way` all attend strongly to `übrigens`, which is the German parallel for the English phrase. In addition, we also see that the English translation `<UNK> stuff` correctly flips the order of the German tokens `zeug <UNK>` (where `zeug` means `stuff`).
+
+Refer to the task's [README](https://github.com/greentfrapp/attention-primer/tree/master/5_translation) for more details.
