@@ -295,13 +295,13 @@ Here we implement the full Transformer model on the IWSLT 2016 de-en dataset, a 
 
 ```
 Input :
-übrigens ist das zeug <UNK> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+übrigens ist das zeug <UNK>
 
 Truth :
-this stuff is <UNK> as <UNK> by the way <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+this stuff is <UNK> as <UNK> by the way
 
 Output:
-by the way that's <UNK> stuff <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD> <PAD>
+by the way that's <UNK> stuff
 ```
 
 <div>
