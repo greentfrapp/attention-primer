@@ -1,6 +1,6 @@
 # attention-primer
 
-Some toy tasks/experiments to illustrate the concept of attention in machine learning, with heavy reference to [Vaswani et. al (2017)](https://arxiv.org/abs/1706.03762). In particular, we see how attention can be used in place of RNNs and CNNs for modeling sequences. 
+Some toy tasks/experiments to illustrate the concept of attention in machine learning, with heavy reference to [Vaswani et al. (2017)](https://arxiv.org/abs/1706.03762). In particular, we see how attention can be used in place of RNNs and CNNs for modeling sequences. 
 
 *In the following scripts, no RNN or CNN is employed in the models.*
 
@@ -287,7 +287,7 @@ Refer to the task's [README](https://github.com/greentfrapp/attention-primer/tre
 
 **In this task, we demonstrate the Transformer model on a translation task.**
 
-Here we implement the full Transformer model on the IWSLT 2016 de-en dataset, a much smaller than the WMT dataset used by Vawani et. al, but sufficient to demonstrate the model's capabilities.
+Here we implement the full Transformer model on the IWSLT 2016 de-en dataset, a much smaller than the WMT dataset used by Vawani et al., but sufficient to demonstrate the model's capabilities.
 
 *The training data and pretrained model is available here for testing.*
 

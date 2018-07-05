@@ -116,15 +116,15 @@ Here the L2-Norm of the positional vector is far larger for the first step (0.81
 
 ### Adjusting `--enc_layers`
 
-Using the script, we can also adjust the number of encoder layers, where each layer comprises self-attention, followed by a regular feed-forward network (see Figure 1 and Section 3.1 in Vaswani et. al (2017)).
+Using the script, we can also adjust the number of encoder layers, where each layer comprises self-attention, followed by a regular feed-forward network (see Figure 1 and Section 3.1 in Vaswani et al. (2017)).
 
-The number of encoder layers allow each step in the sequence to incorporate and encode information from other steps. Figure 4 in Vaswani et. al (2017) shows a good example with the following sentence:
+The number of encoder layers allow each step in the sequence to incorporate and encode information from other steps. Figure 4 in Vaswani et al. (2017) shows a good example with the following sentence:
 
 ```
 The Law will never be perfect, but its application should be just - this is what we are missing, in my opinion.
 ```
 
-By inspecting the self-attention weights for the word `its`, Vaswani et. al (2017) found heavier attentions for the words `Law` and `application`, which are very contextually relevant.
+By inspecting the self-attention weights for the word `its`, Vaswani et al. (2017) found heavier attentions for the words `Law` and `application`, which are very contextually relevant.
 
 In our case, the use of encoder layers allow the input sequence to modify itself based on its own signal. In particular, the decoder is restricted to a single scaled dot-product attention layer, which means that the encoder has to find a good representation for the sequence, so that the decoder can quickly retrieve the relevant information via a single attention layer.
 
