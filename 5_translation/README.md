@@ -2,7 +2,7 @@
 
 ## Preface
 
-Here we implement the full Transformer model on the IWSLT 2016 de-en dataset, a much smaller than the WMT dataset used by Vawani et al., but sufficient to demonstrate the model's capabilities.
+Here we implement the full Transformer model on the IWSLT 2016 de-en dataset, a much smaller dataset than the WMT dataset used by Vawani et al., but sufficient to demonstrate the model's capabilities.
 
 Since the IWSLT dataset is much smaller, we can use a smaller set of hyperparameters, as compared to the original Transformer model. Specifically, we use 1 encoder layer instead of 6, hidden dimension size of 64 rather than 512 and only 4 heads rather than 8 for multihead-attention. Finally, I use learned positional encodings for both encoder and decoder, rather than using the sinusoidal functions.
 
