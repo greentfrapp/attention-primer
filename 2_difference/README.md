@@ -74,7 +74,7 @@ Just as in Task 1, we can also use the `--plot` flag to visualize the attention 
 <img src="https://raw.githubusercontent.com/greentfrapp/attention-primer/master/2_difference/images/enc_attention_noself.png" alt="encoder attention heatmap no self" width="400px" height="whatever" style="display: block;">
 </div>
 
-In other words, Output Step 3 can be modeled as being dependent on Output Steps 1 and 2. But it can also be modeled as simply being dependent on the inputs of Output Steps 1 and 2. With this simple example, we can see that although there is superficial inter-token dependence in the output, this can be reframed as input dependence. 
+In other words, Output Step 3 can be modeled as being dependent on Output Steps 0 and 1. But it can also be modeled as simply being dependent on the inputs of Output Steps 0 and 1. With this simple example, we can see that although there is superficial inter-token dependence in the output, this can be reframed as input dependence. 
 
 However, we do concede that explicitly modeling inter-token dependence in the output can have its advantages, such as leading to simpler and more interpretable models, which brings us to the model with `--self_att`.
 
