@@ -185,7 +185,7 @@ If my **Query** is `[1 0]`, then my weighted sum will be `[0 1]` ie. the **Value
 
 On the other hand, if my **Query** is `[0 1]`, my weighted sum will still be `[0 1]` ie. the **Value** of **Key** `[0 1]`. 
 
-If we pass the weighted sum to the next layer, we lose information about the **Query**. The next layer has no way of telling whether my **Query** was `[1 0]` or `[0 1]`. If we instead pass the sum of the weighted sum and the original **Query**, we retain the information since the vector that we pass on can be either `[2 0]` or `[1 1]`.
+If we pass the weighted sum to the next layer, we lose information about the **Query**. The next layer has no way of telling whether my **Query** was `[1 0]` or `[0 1]`. If we instead pass the sum of the weighted sum and the original **Query**, we retain the information since the vector that we pass on can be either `[0 2]` or `[1 1]`.
 
 Now, we need to think about what are our **Queries**, **Keys** and **Values**. 
 
